@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "176023003462",
+    "project_id": "buenvivir-133ae",
+    "storage_bucket": "buenvivir-133ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:176023003462:android:ebfa29e87b3911be8ac547",
+        "android_client_info": {
+          "package_name": "com.utom.buenvivir"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgGcTAn2D1sn-0UG4KhuskhKegGMjfaCU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
