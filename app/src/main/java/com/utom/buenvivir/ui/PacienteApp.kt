@@ -101,6 +101,8 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
 
     // Datos guardados
     LaunchedEffect(Unit) {
+        // Entra a Firebase como usuario anónimo (la primera vez crea su cuenta)
+        Nube.entrar(Repositorio.nombrePaciente)
         repo.prepararSiVacia()
         Programador.programarTodas(context)
     }

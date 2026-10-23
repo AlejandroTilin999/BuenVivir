@@ -36,6 +36,9 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
         Nube.subirToma(toma, dao.medicina(horario.medicinaId)?.nombre ?: "")
     }
 
+    /** true si este celular ya se usó como paciente (tiene medicinas guardadas). */
+    suspend fun tieneDatos() = dao.contarMedicinas() > 0
+
     suspend fun horarios() = dao.horarios()
     suspend fun horario(id: Long) = dao.horario(id)
     suspend fun medicina(id: Long) = dao.medicina(id)

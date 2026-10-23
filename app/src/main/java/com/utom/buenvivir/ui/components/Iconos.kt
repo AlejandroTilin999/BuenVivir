@@ -52,6 +52,49 @@ object Iconos {
     ).apply {
         addPath(pathData = addPathNodes("M8 5v14l11-7z"), fill = SolidColor(Color.Black))
     }.build()
+    val Persona = icono("M8 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M4 21a8 8 0 0 1 16 0")
+    val Ojo = icono("M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z", "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0")
+    val OjoTachado = icono(
+        "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z",
+        "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0",
+        "M3 3l18 18"
+    )
+
+    /**
+     * Logo de BuenVivir: botiquín azul con una pastilla. Ya trae sus colores,
+     * así que se dibuja con Image(), no con Icon() (Icon lo pintaría de un solo color).
+     */
+    val Logo: ImageVector = ImageVector.Builder(
+        defaultWidth = 120.dp, defaultHeight = 120.dp, viewportWidth = 120f, viewportHeight = 120f
+    ).apply {
+        val bordePastilla = SolidColor(Color(0xFF3470F2))
+        addPath(
+            pathData = addPathNodes("M44 30v-7a6 6 0 0 1 6-6h20a6 6 0 0 1 6 6v7"),
+            stroke = SolidColor(Color(0xFF004EE0)),
+            strokeLineWidth = 6f,
+            strokeLineCap = StrokeCap.Round
+        )
+        addPath(
+            pathData = addPathNodes("M28 28h64a18 18 0 0 1 18 18v42a18 18 0 0 1 -18 18H28a18 18 0 0 1 -18 -18V46a18 18 0 0 1 18 -18z"),
+            fill = SolidColor(Color(0xFF3D7BFF))
+        )
+        group(rotate = -35f, pivotX = 60f, pivotY = 67f) {
+            addPath(
+                pathData = addPathNodes("M43 56h16v22H43a11 11 0 0 1 0-22z"),
+                fill = SolidColor(Color.White),
+                stroke = bordePastilla,
+                strokeLineWidth = 0.9f,
+                strokeLineJoin = StrokeJoin.Round
+            )
+            addPath(
+                pathData = addPathNodes("M61 56h16a11 11 0 0 1 0 22H61z"),
+                fill = SolidColor(Color(0xFFC4B5FD)),
+                stroke = bordePastilla,
+                strokeLineWidth = 0.9f,
+                strokeLineJoin = StrokeJoin.Round
+            )
+        }
+    }.build()
 }
 
 private fun icono(vararg trazos: String, girados: List<String> = emptyList(), grosor: Float = 2.2f): ImageVector =

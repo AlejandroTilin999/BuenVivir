@@ -11,9 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.utom.buenvivir.alarmas.Notificaciones
-import com.utom.buenvivir.data.Nube
-import com.utom.buenvivir.data.Repositorio
-import com.utom.buenvivir.ui.PacienteApp
+import com.utom.buenvivir.ui.Raiz
 import com.utom.buenvivir.ui.theme.BuenVivirTheme
 
 class MainActivity : ComponentActivity() {
@@ -29,11 +27,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         )
         leer(intent)
-        // Entra a Firebase como usuario anónimo (la primera vez crea su cuenta)
-        Nube.entrar(Repositorio.nombrePaciente)
         setContent {
             BuenVivirTheme {
-                PacienteApp(
+                // Raiz decide qué pantallas abrir según el rol de este celular
+                Raiz(
                     abrirMotivo = abrirMotivo,
                     onMotivoAbierto = { abrirMotivo = false }
                 )
