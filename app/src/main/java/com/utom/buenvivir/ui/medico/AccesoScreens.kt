@@ -26,9 +26,10 @@ import com.utom.buenvivir.ui.components.EnlaceSecundario
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
 
-/** M2: iniciar sesión del médico. */
+/** M2: iniciar sesión (médico o familiar). */
 @Composable
 fun LoginScreen(
+    esFamiliar: Boolean = false,
     ocupado: Boolean,
     aviso: AvisoMedico?,
     onEntrar: (correo: String, contrasena: String) -> Unit,
@@ -41,7 +42,12 @@ fun LoginScreen(
 
     Pantalla {
         Regresar("Cambiar rol", onCambiarRol)
-        Encabezado("Inicia sesión", "Con tu cuenta ves a tus pacientes desde cualquier celular.")
+        Encabezado(
+            esFamiliar,
+            "Inicia sesión",
+            if (esFamiliar) "Con tu cuenta ves cómo va la persona que cuidas, desde cualquier celular."
+            else "Con tu cuenta ves a tus pacientes desde cualquier celular."
+        )
         Campo("Correo", correo, { correo = it }, teclado = KeyboardType.Email)
         Column {
             Campo("Contraseña", contrasena, { contrasena = it }, teclado = KeyboardType.Password,
@@ -72,9 +78,10 @@ fun LoginScreen(
     }
 }
 
-/** M3: crear la cuenta del médico. */
+/** M3: crear la cuenta. El médico pone cédula y dónde da consulta; el familiar, qué es del paciente. */
 @Composable
 fun RegistroScreen(
+    esFamiliar: Boolean = false,
     ocupado: Boolean,
     aviso: AvisoMedico?,
     onCrear: (nombre: String, cedula: String, lugar: String, correo: String, contrasena: String) -> Unit,
@@ -89,10 +96,17 @@ fun RegistroScreen(
 
     Pantalla {
         Regresar("Iniciar sesión", onIniciarSesion)
-        Encabezado("Crea tu cuenta", "Tus pacientes verán tu nombre y dónde das consulta.")
-        Campo("Nombre completo", nombre, { nombre = it })
-        Campo("Cédula profesional", cedula, { cedula = it }, teclado = KeyboardType.Number)
-        Campo("Dónde das consulta", lugar, { lugar = it }, ayuda = "Por ejemplo: Centro de Salud de Maravatío")
+        if (esFamiliar) {
+            Encabezado(true, "Crea tu cuenta", "La persona que cuidas verá tu nombre y qué eres de él o ella.")
+            Campo("Nombre completo", nombre, { nombre = it })
+            // Para el familiar, "lugar" guarda qué es del paciente
+            Campo("¿Qué eres de la persona que cuidas?", lugar, { lugar = it }, ayuda = "Por ejemplo: Hija, Nieto, Enfermera")
+        } else {
+            Encabezado(false, "Crea tu cuenta", "Tus pacientes verán tu nombre y dónde das consulta.")
+            Campo("Nombre completo", nombre, { nombre = it })
+            Campo("Cédula profesional", cedula, { cedula = it }, teclado = KeyboardType.Number)
+            Campo("Dónde das consulta", lugar, { lugar = it }, ayuda = "Por ejemplo: Centro de Salud de Maravatío")
+        }
         Campo("Correo", correo, { correo = it }, teclado = KeyboardType.Email)
         Campo("Contraseña", contrasena, { contrasena = it }, ayuda = "Mínimo 8 caracteres",
             teclado = KeyboardType.Password, esContrasena = true, ultimo = true, onListo = crear)
@@ -120,7 +134,7 @@ private fun Pantalla(contenido: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun Encabezado(titulo: String, texto: String) {
+private fun Encabezado(esFamiliar: Boolean, titulo: String, texto: String) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier
@@ -130,8 +144,8 @@ private fun Encabezado(titulo: String, texto: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(Iconos.Estetoscopio, contentDescription = null, tint = TextoChip, modifier = Modifier.size(16.dp))
-            Text("Médico", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextoChip)
+            Icon(if (esFamiliar) Iconos.Familia else Iconos.Estetoscopio, contentDescription = null, tint = TextoChip, modifier = Modifier.size(16.dp))
+            Text(if (esFamiliar) "Cuidador" else "Médico", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextoChip)
         }
         Text(
             titulo,
@@ -150,11 +164,18 @@ private fun Encabezado(titulo: String, texto: String) {
 @Preview(name = "M2 · Iniciar sesión", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewLogin() = BuenVivirTheme {
-    LoginScreen(false, AvisoMedico("El correo o la contraseña no son correctos.", true), { _, _ -> }, {}, {}, {})
+    LoginScreen(ocupado = false, aviso = AvisoMedico("El correo o la contraseña no son correctos.", true),
+        onEntrar = { _, _ -> }, onOlvide = {}, onCrearCuenta = {}, onCambiarRol = {})
 }
 
 @Preview(name = "M3 · Crear cuenta", widthDp = 360, heightDp = 1000, showBackground = true)
 @Composable
 private fun PreviewRegistro() = BuenVivirTheme {
-    RegistroScreen(false, null, { _, _, _, _, _ -> }, {})
+    RegistroScreen(ocupado = false, aviso = null, onCrear = { _, _, _, _, _ -> }, onIniciarSesion = {})
+}
+
+@Preview(name = "M3 · Crear cuenta (cuidador)", widthDp = 360, heightDp = 900, showBackground = true)
+@Composable
+private fun PreviewRegistroFamiliar() = BuenVivirTheme {
+    RegistroScreen(esFamiliar = true, ocupado = false, aviso = null, onCrear = { _, _, _, _, _ -> }, onIniciarSesion = {})
 }

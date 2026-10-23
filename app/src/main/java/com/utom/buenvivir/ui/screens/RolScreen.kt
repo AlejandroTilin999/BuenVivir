@@ -73,7 +73,7 @@ fun RolScreen(onContinuar: (RolElegido) -> Unit) {
         ) {
             OpcionRol("Soy paciente", "Me recuerda mis pastillas", Iconos.Persona,
                 elegido == RolElegido.Paciente) { elegido = RolElegido.Paciente }
-            OpcionRol("Soy familiar", "Veo si mi familiar tomó su medicina", Iconos.Familia,
+            OpcionRol("Soy cuidador", "Veo si la persona que cuido tomó su medicina", Iconos.Familia,
                 elegido == RolElegido.Familiar) { elegido = RolElegido.Familiar }
             OpcionRol("Soy médico", "Doy recetas y sigo a mis pacientes", Iconos.Estetoscopio,
                 elegido == RolElegido.Medico) { elegido = RolElegido.Medico }

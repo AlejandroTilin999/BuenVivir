@@ -117,7 +117,7 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
     suspend fun reiniciarDemo() {
         dao.borrarTomas()
         val hs = dao.horarios()
-        val demo = if (CARGAR_DEMO && hs.size >= 2) cargarDemo(hs[0].medicinaId, hs[0].id, hs[1].id) else emptyList()
+        val demo = if (hs.size >= 2) cargarDemo(hs[0].medicinaId, hs[0].id, hs[1].id) else emptyList()
         Nube.reemplazarTomas(conNombre(demo))
     }
 
@@ -128,9 +128,12 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
         return tomas.map { it to (nombres[it.medicinaId] ?: "") }
     }
 
-    /** La primera vez que se abre la app, carga la medicina (y la semana de demostración). */
+    /**
+     * Solo en MODO DEMOSTRACIÓN: si el celular está vacío, carga la Metformina y la semana de ejemplo.
+     * Con CARGAR_DEMO = false la app empieza vacía y las medicinas llegan de su médico.
+     */
     suspend fun prepararSiVacia() {
-        if (dao.contarMedicinas() > 0) return
+        if (!CARGAR_DEMO || dao.contarMedicinas() > 0) return
 
         val medicinaId = dao.insertarMedicina(
             MedicinaEntity(
@@ -182,8 +185,15 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
     }
 
     companion object {
-        /** Cambia a false para empezar sin historial. */
-        const val CARGAR_DEMO = true
+        /**
+         * true  = celular de la feria: si está vacío carga la Metformina y la semana de ejemplo,
+         *         y en Ajustes aparece "Reiniciar demostración".
+         * false = app real: empieza vacía y sus medicinas llegan de su médico.
+         */
+        const val CARGAR_DEMO = false
+
+        /** Muestra "Reiniciar demostración" en Ajustes (para practicar y para la feria). */
+        const val MOSTRAR_REINICIAR = true
 
         @Volatile private var instancia: RepositorioLocal? = null
 

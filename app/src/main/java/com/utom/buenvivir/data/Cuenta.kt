@@ -17,14 +17,18 @@ sealed interface Resultado {
     data class Mal(val mensaje: String) : Resultado
 }
 
-/** Lo que el médico escribió al crear su cuenta. */
+/** Lo que escribió al crear su cuenta (médico o familiar). */
 data class PerfilMedico(
     val nombre: String,
     val cedula: String,
     val lugar: String,
     val correo: String,
-    val correoConfirmado: Boolean
-)
+    val correoConfirmado: Boolean,
+    val rol: String = SesionStore.MEDICO,
+    val parentesco: String = ""      // solo familiar: "Hija", "Nieto"...
+) {
+    val esFamiliar get() = rol == SesionStore.FAMILIAR
+}
 
 /** Espera a que Firebase termine, sin usar otra librería. */
 suspend fun <T> Task<T>.esperar(): T = suspendCancellableCoroutine { c ->
@@ -49,21 +53,32 @@ object Cuenta {
     /** true si hay alguien con correo y contraseña dentro. */
     fun tieneSesion() = auth.currentUser?.isAnonymous == false
 
-    suspend fun entrar(correo: String, contrasena: String): Resultado {
+    suspend fun entrar(correo: String, contrasena: String, rolEsperado: String = SesionStore.MEDICO): Resultado {
         if (correo.isBlank() || contrasena.isBlank()) return Resultado.Mal("Escribe tu correo y tu contraseña.")
         return try {
             val uid = auth.signInWithEmailAndPassword(correo.trim(), contrasena).esperar().user!!.uid
             val rol = db.collection("usuarios").document(uid).get().esperar().getString("rol")
-            if (rol != SesionStore.MEDICO) {
+            if (rol != rolEsperado) {
                 auth.signOut()
-                Resultado.Mal("Esta cuenta no es de médico.")
+                Resultado.Mal(
+                    if (rolEsperado == SesionStore.FAMILIAR) "Esta cuenta no es de cuidador. Regresa y elige \"Soy médico\"."
+                    else "Esta cuenta no es de médico. Regresa y elige \"Soy cuidador\"."
+                )
             } else Resultado.Bien
         } catch (e: Exception) {
             Resultado.Mal(mensajeDe(e))
         }
     }
 
-    suspend fun crear(nombre: String, cedula: String, lugar: String, correo: String, contrasena: String): Resultado {
+    suspend fun crear(
+        nombre: String,
+        cedula: String,
+        lugar: String,
+        correo: String,
+        contrasena: String,
+        rol: String = SesionStore.MEDICO,
+        parentesco: String = ""
+    ): Resultado {
         when {
             nombre.isBlank() -> return Resultado.Mal("Escribe tu nombre.")
             correo.isBlank() -> return Resultado.Mal("Escribe tu correo.")
@@ -74,8 +89,9 @@ object Cuenta {
             val usuario = auth.createUserWithEmailAndPassword(correo.trim(), contrasena).esperar().user!!
             db.collection("usuarios").document(usuario.uid).set(
                 mapOf(
-                    "rol" to SesionStore.MEDICO,
+                    "rol" to rol,
                     "nombre" to nombre.trim(),
+                    "parentesco" to parentesco.trim(),
                     "cedula" to cedula.trim(),
                     "lugar" to lugar.trim(),
                     "correo" to correo.trim(),
@@ -109,7 +125,9 @@ object Cuenta {
                 cedula = d.getString("cedula") ?: "",
                 lugar = d.getString("lugar") ?: "",
                 correo = usuario.email ?: "",
-                correoConfirmado = usuario.isEmailVerified
+                correoConfirmado = usuario.isEmailVerified,
+                rol = d.getString("rol") ?: SesionStore.MEDICO,
+                parentesco = d.getString("parentesco") ?: ""
             )
         } catch (_: Exception) {
             null

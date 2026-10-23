@@ -136,8 +136,12 @@ object Nube {
 
     /** El paciente quita a alguien: ya no podrá ver sus tomas. */
     fun quitarDelEquipo(id: String) = conUsuario { uid ->
-        db.collection("pacientes").document(uid).collection("equipo").document(id).delete()
+        val paciente = db.collection("pacientes").document(uid)
+        paciente.collection("equipo").document(id).delete()
             .addOnFailureListener { Log.w(TAG, "No se pudo quitar", it) }
+        // Si era su médico, se quita la marca para que su cuidador pueda agregar medicinas
+        val marca = paciente.collection("marcas").document("medico")
+        marca.get().addOnSuccessListener { if (it.getString("uid") == id) marca.delete() }
     }
 
     private fun tomasDe(uid: String) =

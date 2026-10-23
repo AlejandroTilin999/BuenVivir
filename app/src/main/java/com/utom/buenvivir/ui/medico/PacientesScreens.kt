@@ -35,6 +35,8 @@ import com.utom.buenvivir.data.Busqueda
 import com.utom.buenvivir.data.MedicinaNube
 import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.Resultado
+import com.utom.buenvivir.data.SesionStore
+import kotlinx.coroutines.flow.flowOf
 import com.utom.buenvivir.data.PacienteVinculado
 import com.utom.buenvivir.data.TomaNube
 import com.utom.buenvivir.data.TomasPaciente
@@ -161,7 +163,7 @@ fun PacientesScreen(
                         .background(Blanco)
                         .padding(horizontal = 12.dp, vertical = 12.dp)
                 ) {
-                    Dato(pacientes.size, if (pacientes.size == 1) "paciente" else "pacientes", TextoOscuro, Modifier.weight(1f))
+                    Dato(pacientes.size, if (pacientes.size == 1) texto("paciente", "persona") else texto("pacientes", "personas"), TextoOscuro, Modifier.weight(1f))
                     Dato(vanBien, if (vanBien == 1) "va bien" else "van bien", Violeta, Modifier.weight(1f))
                     Dato(revisar, "por revisar", GrisAviso, Modifier.weight(1f))
                 }
@@ -185,7 +187,7 @@ fun PacientesScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            if (pacientes.size == 1) "Tu paciente" else "Tus pacientes",
+                            if (pacientes.size == 1) texto("Tu paciente", "A quien cuidas") else texto("Tus pacientes", "A quienes cuidas"),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = TextoNormal,
@@ -199,7 +201,7 @@ fun PacientesScreen(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            BotonPrincipal("Vincular paciente", onClick = onVincular)
+            BotonPrincipal(texto("Vincular paciente", "Vincular persona"), onClick = onVincular)
         }
     }
 }
@@ -232,9 +234,12 @@ private fun SinPacientes() {
         ) {
             Icon(Iconos.Familia, contentDescription = null, tint = TextoChip, modifier = Modifier.size(32.dp))
         }
-        Text("Todavía no tienes pacientes", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
+        Text(texto("Todavía no tienes pacientes", "Todavía no cuidas a nadie"), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
         Text(
-            "Pídele a tu paciente el código que aparece en su app, en Mi familia → Agregar a alguien.",
+            texto(
+                "Pídele a tu paciente el código que aparece en su app, en Mi familia → Agregar a alguien.",
+                "Pídele a la persona que cuidas el código que aparece en su app, en Mi familia → Agregar a alguien."
+            ),
             fontSize = 17.sp,
             lineHeight = 24.sp,
             color = TextoSecundario
@@ -354,10 +359,10 @@ fun VincularScreen(onRegresar: () -> Unit, onVinculado: (String) -> Unit) {
             .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Regresar("Pacientes", onRegresar)
+        Regresar(texto("Pacientes", "Personas"), onRegresar)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "Vincular paciente",
+                texto("Vincular paciente", "Vincular persona"),
                 fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = TextoOscuro,
@@ -365,14 +370,17 @@ fun VincularScreen(onRegresar: () -> Unit, onVinculado: (String) -> Unit) {
                 modifier = Modifier.semantics { heading() }
             )
             Text(
+                texto(
                 "Pídele a tu paciente el código que aparece en su app, en Mi familia → Agregar a alguien.",
+                "Pídele a la persona que cuidas el código que aparece en su app, en Mi familia → Agregar a alguien."
+            ),
                 fontSize = 17.sp,
                 lineHeight = 24.sp,
                 color = TextoSecundario
             )
         }
         Campo(
-            etiqueta = "Código del paciente",
+            etiqueta = texto("Código del paciente", "Su código"),
             valor = codigo,
             onCambio = { nuevo ->
                 codigo = nuevo.uppercase().filter { it.isLetterOrDigit() }.take(6)
@@ -432,6 +440,15 @@ fun DetallePacienteScreen(
     val medicinas by remember(p.id) { Recetas.escuchar(p.id) }.collectAsState(initial = null)
     var porQuitar by remember { mutableStateOf<MedicinaNube?>(null) }
     var errorMedicina by remember { mutableStateOf<String?>(null) }
+
+    // Permisos: el médico cambia todo. El cuidador solo agrega o quita si el paciente no tiene médico,
+    // y nunca quita lo que recetó un médico (las reglas de Firebase dicen lo mismo).
+    val esCuidador = LocalEsCuidador.current
+    val conMedico by remember(p.id, esCuidador) {
+        if (esCuidador) Vinculos.tieneMedico(p.id) else flowOf(false)
+    }.collectAsState(initial = null)
+    LaunchedEffect(p.id, esCuidador) { if (!esCuidador) Vinculos.marcarComoSuMedico(p.id) }
+    val cuidadorLibre = esCuidador && conMedico == false
     val hoy = LocalDate.now()
     val estado by remember(p.id) { Vinculos.tomas(p.id, desdeSemana(hoy)) }
         .collectAsState(initial = TomasPaciente.Cargando)
@@ -446,7 +463,7 @@ fun DetallePacienteScreen(
             .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Regresar("Pacientes", onRegresar)
+        Regresar(texto("Pacientes", "Personas"), onRegresar)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Inicial(p.nombre, fondo = Lavanda, tamano = 64)
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -475,7 +492,14 @@ fun DetallePacienteScreen(
         }
 
         if (estado !is TomasPaciente.SinPermiso) {
-            Medicinas(medicinas, onQuitar = { porQuitar = it }, onAgregar = onAgregarMedicina)
+            Medicinas(
+                lista = medicinas,
+                puedeAgregar = !esCuidador || cuidadorLibre,
+                puedeQuitar = { m -> !esCuidador || (cuidadorLibre && m.agregadaPor != SesionStore.MEDICO) },
+                nota = if (esCuidador && conMedico == true) "Solo su médico puede cambiar sus medicinas." else null,
+                onQuitar = { porQuitar = it },
+                onAgregar = onAgregarMedicina
+            )
             errorMedicina?.let { Aviso(AvisoMedico(it, esError = true)) }
         }
 
@@ -486,7 +510,7 @@ fun DetallePacienteScreen(
             border = BorderStroke(2.dp, AzulBoton),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = AzulBoton)
         ) {
-            Text("Dejar de ver a este paciente", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(texto("Dejar de ver a este paciente", "Dejar de ver a esta persona"), fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
     }
 
@@ -702,7 +726,14 @@ private fun UltimasTomas(tomas: List<TomaNube>, hoy: LocalDate) {
 // ---------- Medicinas del paciente ----------
 
 @Composable
-private fun Medicinas(lista: List<MedicinaNube>?, onQuitar: (MedicinaNube) -> Unit, onAgregar: () -> Unit) {
+private fun Medicinas(
+    lista: List<MedicinaNube>?,
+    puedeAgregar: Boolean,
+    puedeQuitar: (MedicinaNube) -> Boolean,
+    nota: String?,
+    onQuitar: (MedicinaNube) -> Unit,
+    onAgregar: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             "Sus medicinas",
@@ -733,7 +764,7 @@ private fun Medicinas(lista: List<MedicinaNube>?, onQuitar: (MedicinaNube) -> Un
                             color = TextoChip
                         )
                     }
-                    Text(
+                    if (puedeQuitar(m)) Text(
                         "Quitar",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
@@ -746,7 +777,8 @@ private fun Medicinas(lista: List<MedicinaNube>?, onQuitar: (MedicinaNube) -> Un
                 }
             }
         }
-        Row(
+        nota?.let { Text(it, fontSize = 16.sp, color = TextoSecundario) }
+        if (puedeAgregar) Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)

@@ -41,6 +41,8 @@ sealed interface TomasPaciente {
  *
  *   usuarios/{uidMedico}/pacientes/{uidPaciente} -> nombre, codigo, desde   (su lista)
  *   pacientes/{uidPaciente}/equipo/{uidMedico}  -> rol, nombre, detalle, codigo, desde (el permiso)
+ *   pacientes/{uidPaciente}/marcas/medico        -> uid, desde  (existe si el paciente tiene médico;
+ *                                                   así el cuidador ya no puede cambiar sus medicinas)
  */
 object Vinculos {
     private val auth get() = FirebaseAuth.getInstance()
@@ -48,6 +50,28 @@ object Vinculos {
     private val miId get() = auth.currentUser?.uid ?: ""
 
     private fun miLista() = db.collection("usuarios").document(miId).collection("pacientes")
+
+    private fun marcaMedico(pacienteId: String) =
+        db.collection("pacientes").document(pacienteId).collection("marcas").document("medico")
+
+    /** El médico deja la marca "este paciente ya tiene médico" (al vincularse y cada vez que lo abre). */
+    suspend fun marcarComoSuMedico(pacienteId: String) {
+        try {
+            marcaMedico(pacienteId).set(mapOf("uid" to miId, "desde" to Timestamp.now())).esperar()
+        } catch (_: Exception) {
+            // Sin internet o sin permiso: se intenta otra vez la próxima vez que lo abra
+        }
+    }
+
+    /** Para el cuidador: true si el paciente tiene médico (entonces solo el médico cambia medicinas). */
+    fun tieneMedico(pacienteId: String): Flow<Boolean?> = callbackFlow {
+        val registro = marcaMedico(pacienteId).addSnapshotListener { snap, error ->
+            if (error != null) { trySend(null); return@addSnapshotListener }
+            snap ?: return@addSnapshotListener
+            trySend(snap.exists())
+        }
+        awaitClose { registro.remove() }
+    }
 
     suspend fun buscar(codigoEscrito: String): Busqueda {
         // Acepta "k7m 2q9", "K7M2Q9"... y lo deja como "K7M2Q9"
@@ -74,9 +98,10 @@ object Vinculos {
             .set(
                 db.collection("pacientes").document(p.id).collection("equipo").document(miId),
                 mapOf(
-                    "rol" to SesionStore.MEDICO,
+                    "rol" to (perfil?.rol ?: SesionStore.MEDICO),
                     "nombre" to (perfil?.nombre ?: ""),
-                    "detalle" to (perfil?.lugar ?: ""),
+                    // Lo que ve el paciente debajo del nombre: dónde da consulta, o "Hija", "Nieto"...
+                    "detalle" to (if (perfil?.esFamiliar == true) perfil.parentesco else perfil?.lugar ?: ""),
                     "codigo" to p.codigo,
                     "desde" to ahora
                 )
@@ -85,14 +110,22 @@ object Vinculos {
             .set(miLista().document(p.id), mapOf("nombre" to p.nombre, "codigo" to p.codigo, "desde" to ahora))
             .commit()
             .esperar()
+        if (perfil?.esFamiliar != true) marcarComoSuMedico(p.id)
         Resultado.Bien
     } catch (e: Exception) {
         Resultado.Mal(Cuenta.mensajeDe(e))
     }
 
     suspend fun desvincular(pacienteId: String): Resultado = try {
-        db.batch()
-            .delete(db.collection("pacientes").document(pacienteId).collection("equipo").document(miId))
+        // Si era su médico, se quita la marca para que su cuidador pueda volver a agregar medicinas
+        val eraSuMedico = try {
+            marcaMedico(pacienteId).get().esperar().getString("uid") == miId
+        } catch (_: Exception) {
+            false
+        }
+        val lote = db.batch()
+        if (eraSuMedico) lote.delete(marcaMedico(pacienteId))
+        lote.delete(db.collection("pacientes").document(pacienteId).collection("equipo").document(miId))
             .delete(miLista().document(pacienteId))
             .commit()
             .esperar()

@@ -39,6 +39,16 @@ import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
 
+/**
+ * true si quien usa estas pantallas es un cuidador (no un médico).
+ * Las pantallas son las mismas; solo cambian algunas palabras ("persona" en vez de "paciente").
+ */
+val LocalEsCuidador = compositionLocalOf { false }
+
+/** Elige el texto según quién usa la app. */
+@Composable
+fun texto(medico: String, cuidador: String): String = if (LocalEsCuidador.current) cuidador else medico
+
 /** Un aviso debajo de los campos: error (gris oscuro) o información (lavanda). */
 data class AvisoMedico(val texto: String, val esError: Boolean)
 
@@ -176,7 +186,7 @@ fun MenuMedico(seleccionado: Int, onPacientes: () -> Unit, onPerfil: () -> Unit)
                 .navigationBarsPadding()
                 .padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 18.dp)
         ) {
-            ElementoMenuMedico("Pacientes", Iconos.Familia, seleccionado == 0, onPacientes, Modifier.weight(1f))
+            ElementoMenuMedico(texto("Pacientes", "Personas"), Iconos.Familia, seleccionado == 0, onPacientes, Modifier.weight(1f))
             ElementoMenuMedico("Mi perfil", Iconos.Persona, seleccionado == 1, onPerfil, Modifier.weight(1f))
         }
     }

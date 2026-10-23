@@ -55,6 +55,7 @@ private val MOMENTOS = listOf("antes de comer", "con la comida", "después de co
 fun RecetaScreen(
     paciente: String,
     medico: String,
+    rol: String = SesionStore.MEDICO,
     ocupado: Boolean,
     aviso: AvisoMedico?,
     onRegresar: () -> Unit,
@@ -109,7 +110,7 @@ fun RecetaScreen(
                 cantidad = cantidadCompleta,
                 indicacion = cuando,
                 horarios = horarios.sorted().mapIndexed { i, m -> HorarioNube("h$i", m, cuando) },
-                agregadaPor = SesionStore.MEDICO,
+                agregadaPor = rol,
                 quien = medico
             )
         )

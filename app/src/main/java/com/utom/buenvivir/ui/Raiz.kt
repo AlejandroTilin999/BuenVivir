@@ -23,7 +23,7 @@ private const val CARGANDO = "…"
 
 /**
  * Decide qué pantallas abrir según el rol guardado en este celular:
- * sin rol -> Elegir rol; paciente -> PacienteApp; médico -> MedicoApp.
+ * sin rol -> Elegir rol; paciente -> PacienteApp; médico o familiar -> MedicoApp.
  */
 @Composable
 fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
@@ -32,7 +32,8 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
     val sesion = remember { SesionStore(context) }
     val rol by sesion.rol.collectAsState(initial = CARGANDO)
     var revisado by remember { mutableStateOf(false) }
-    var entrandoMedico by rememberSaveable { mutableStateOf(false) }
+    // Médico o familiar que todavía no inicia sesión (los dos usan correo y contraseña)
+    var entrandoComo by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Celulares que ya se usaban como paciente antes de que existieran los roles:
     // se quedan como paciente sin preguntar (y sin perder su cuenta).
@@ -52,25 +53,27 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
 
         rol == SesionStore.PACIENTE -> PacienteApp(abrirMotivo, onMotivoAbierto)
 
-        rol == SesionStore.MEDICO -> MedicoApp(
+        // El familiar usa las mismas pantallas del médico (ver tomas, vincular, agregar medicinas)
+        rol == SesionStore.MEDICO || rol == SesionStore.FAMILIAR -> MedicoApp(
+            rol = rol!!,
             onSalir = {
                 Cuenta.salir()
-                entrandoMedico = false
+                entrandoComo = null
                 guardar(null)
             }
         )
 
-        entrandoMedico -> AccesoMedico(
-            onEntro = { guardar(SesionStore.MEDICO) },
-            onCambiarRol = { entrandoMedico = false }
+        entrandoComo != null -> AccesoMedico(
+            rol = entrandoComo!!,
+            onEntro = { guardar(entrandoComo) },
+            onCambiarRol = { entrandoComo = null }
         )
 
         else -> RolScreen { elegido ->
             when (elegido) {
                 RolElegido.Paciente -> guardar(SesionStore.PACIENTE)
-                RolElegido.Medico -> entrandoMedico = true
-                RolElegido.Familiar ->
-                    Toast.makeText(context, "El rol de familiar llega pronto", Toast.LENGTH_SHORT).show()
+                RolElegido.Medico -> entrandoComo = SesionStore.MEDICO
+                RolElegido.Familiar -> entrandoComo = SesionStore.FAMILIAR
             }
         }
     }

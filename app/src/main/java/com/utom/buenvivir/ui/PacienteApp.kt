@@ -57,6 +57,7 @@ import com.utom.buenvivir.ui.screens.FamiliaScreen
 import com.utom.buenvivir.ui.screens.InicioScreen
 import com.utom.buenvivir.ui.screens.MedicinasScreen
 import com.utom.buenvivir.ui.screens.MotivoSheet
+import com.utom.buenvivir.ui.screens.SinMedicinasScreen
 import com.utom.buenvivir.ui.theme.AzulMarino
 import com.utom.buenvivir.ui.theme.Blanco
 import kotlinx.coroutines.delay
@@ -134,7 +135,8 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
             onMotivoAbierto()
         }
     }
-    val meds by repo.medicinas.collectAsState(initial = emptyList())
+    val medsCargadas by repo.medicinas.collectAsState(initial = null)
+    val meds = medsCargadas.orEmpty()
     val hoy = ahora.toLocalDate()
     val lunes = hoy.minusDays(hoy.dayOfWeek.value - 1L)
     val tomas by remember(lunes) { repo.tomasDesde(lunes) }.collectAsState(initial = emptyList())
@@ -174,8 +176,62 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     LaunchedEffect(mostrarMotivo, pestana) { lector.callar() }
 
     // Mientras se carga la base de datos la primera vez (es un instante)
-    if (p == null) {
+    if (medsCargadas == null) {
         Box(Modifier.fillMaxSize().background(Blanco))
+        return
+    }
+
+    // Todavía no tiene medicinas: se le explica que su médico se las agrega
+    if (p == null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (pestana) {
+                2 -> FamiliaScreen(
+                    equipo = equipo,
+                    onEscuchar = { lector.leer(textoFamilia(equipo)) },
+                    onAgregar = { pestana = 5 },
+                    onQuitar = { m -> Nube.quitarDelEquipo(m.id) },
+                    onIrInicio = { pestana = 0 },
+                    onIrMedicinas = { pestana = 0 }
+                )
+                5 -> CodigoScreen(
+                    estado = estadoCodigo,
+                    onRegresar = { pestana = 0 },
+                    onEscuchar = {
+                        (estadoCodigo as? EstadoCodigo.Listo)?.let { lector.leer(textoCodigo(it.codigo)) }
+                    },
+                    onReintentar = { intentosCodigo++ },
+                    onIrInicio = { pestana = 0 },
+                    onIrMedicinas = { pestana = 0 }
+                )
+                4 -> AjustesScreen(
+                    ajustes = ajustes,
+                    nombre = Repositorio.nombrePaciente,
+                    relojNombre = Repositorio.relojNombre,
+                    relojConectado = Repositorio.relojConectado,
+                    onCambiar = { nuevos -> scope.launch { store.guardar(nuevos) } },
+                    onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel) },
+                    onRegresar = { pestana = 0 },
+                    onEscuchar = { lector.leer(textoAjustes(ajustes)) },
+                    mostrarDemo = false,
+                    puedeProbar = false,
+                    onIrMedicinas = { pestana = 0 },
+                    onIrFamilia = { pestana = 2 }
+                )
+                else -> SinMedicinasScreen(
+                    nombre = Repositorio.nombrePaciente,
+                    onEscuchar = {
+                        lector.leer(
+                            "Todavía no tienes medicinas. Dale tu código a tu médico. " +
+                                "Cuando te agregue una medicina, aparecerá aquí con su alarma."
+                        )
+                    },
+                    onVerCodigo = { pestana = 5 },
+                    onAjustes = { pestana = 4 },
+                    onIrMedicinas = { pestana = 0 },
+                    onIrFamilia = { pestana = 2 }
+                )
+            }
+        }
         return
     }
 
@@ -251,6 +307,7 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
                     Programador.programarPrueba(context, p.horario.id, p.hoy)
                     avisar("Sonará en 1 minuto")
                 },
+                mostrarDemo = RepositorioLocal.MOSTRAR_REINICIAR,
                 onReiniciarDemo = {
                     scope.launch { repo.reiniciarDemo() }
                     Notificaciones.quitar(context, p.horario.id)

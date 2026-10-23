@@ -82,7 +82,7 @@ fun FamiliaScreen(
                 }
             }
             if (familia.isNotEmpty()) {
-                Seccion("Familia") {
+                Seccion("Quienes te cuidan") {
                     familia.forEach { TarjetaFamiliar(it) { porQuitar = it } }
                 }
             }

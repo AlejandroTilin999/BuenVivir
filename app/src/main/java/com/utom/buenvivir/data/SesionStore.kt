@@ -25,5 +25,6 @@ class SesionStore(private val context: Context) {
     companion object {
         const val PACIENTE = "paciente"
         const val MEDICO = "medico"
+        const val FAMILIAR = "familiar"
     }
 }

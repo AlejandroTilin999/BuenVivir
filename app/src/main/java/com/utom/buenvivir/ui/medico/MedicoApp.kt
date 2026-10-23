@@ -31,15 +31,17 @@ import com.utom.buenvivir.data.PacienteVinculado
 import com.utom.buenvivir.data.PerfilMedico
 import com.utom.buenvivir.data.Vinculos
 import com.utom.buenvivir.data.Recetas
+import com.utom.buenvivir.data.SesionStore
 import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 
-/** Antes de entrar: iniciar sesión (M2) o crear cuenta (M3). */
+/** Antes de entrar: iniciar sesión (M2) o crear cuenta (M3). Sirve para médico y familiar. */
 @Composable
-fun AccesoMedico(onEntro: () -> Unit, onCambiarRol: () -> Unit) {
+fun AccesoMedico(rol: String = SesionStore.MEDICO, onEntro: () -> Unit, onCambiarRol: () -> Unit) {
+    val esFamiliar = rol == SesionStore.FAMILIAR
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var registrando by rememberSaveable { mutableStateOf(false) }
@@ -63,11 +65,17 @@ fun AccesoMedico(onEntro: () -> Unit, onCambiarRol: () -> Unit) {
 
     if (registrando) {
         RegistroScreen(
+            esFamiliar = esFamiliar,
             ocupado = ocupado,
             aviso = aviso,
             onCrear = { nombre, cedula, lugar, correo, contrasena ->
                 trabajar {
-                    when (val r = Cuenta.crear(nombre, cedula, lugar, correo, contrasena)) {
+                    val r = if (esFamiliar) {
+                        Cuenta.crear(nombre, "", "", correo, contrasena, rol = rol, parentesco = lugar)
+                    } else {
+                        Cuenta.crear(nombre, cedula, lugar, correo, contrasena, rol = rol)
+                    }
+                    when (r) {
                         Resultado.Bien -> {
                             Toast.makeText(context, "Te mandamos un correo para confirmar tu cuenta", Toast.LENGTH_LONG).show()
                             onEntro()
@@ -80,11 +88,12 @@ fun AccesoMedico(onEntro: () -> Unit, onCambiarRol: () -> Unit) {
         )
     } else {
         LoginScreen(
+            esFamiliar = esFamiliar,
             ocupado = ocupado,
             aviso = aviso,
             onEntrar = { correo, contrasena ->
                 trabajar {
-                    when (val r = Cuenta.entrar(correo, contrasena)) {
+                    when (val r = Cuenta.entrar(correo, contrasena, rol)) {
                         Resultado.Bien -> onEntro()
                         is Resultado.Mal -> aviso = AvisoMedico(r.mensaje, esError = true)
                     }
@@ -106,7 +115,14 @@ fun AccesoMedico(onEntro: () -> Unit, onCambiarRol: () -> Unit) {
 
 /** Ya dentro: Mis pacientes (M4), Vincular (M5), Detalle (M6) y Mi perfil. */
 @Composable
-fun MedicoApp(onSalir: () -> Unit) {
+fun MedicoApp(rol: String = SesionStore.MEDICO, onSalir: () -> Unit) {
+    CompositionLocalProvider(LocalEsCuidador provides (rol == SesionStore.FAMILIAR)) {
+        PantallasMedico(onSalir)
+    }
+}
+
+@Composable
+private fun PantallasMedico(onSalir: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Pacientes, 1 Mi perfil
@@ -142,6 +158,7 @@ fun MedicoApp(onSalir: () -> Unit) {
             RecetaScreen(
                 paciente = p.nombre,
                 medico = perfil?.nombre ?: "",
+                rol = perfil?.rol ?: SesionStore.MEDICO,
                 ocupado = guardando,
                 aviso = avisoReceta,
                 onRegresar = { recetando = false; avisoReceta = null },
@@ -238,8 +255,12 @@ fun PerfilMedicoScreen(perfil: PerfilMedico?, onSalir: () -> Unit) {
                 .padding(horizontal = 18.dp, vertical = 8.dp)
         ) {
             Dato("Nombre", perfil?.nombre)
-            Dato("Cédula profesional", perfil?.cedula)
-            Dato("Dónde das consulta", perfil?.lugar)
+            if (perfil?.esFamiliar == true) {
+                Dato("Qué eres de la persona que cuidas", perfil?.parentesco)
+            } else {
+                Dato("Cédula profesional", perfil?.cedula)
+                Dato("Dónde das consulta", perfil?.lugar)
+            }
             Dato("Correo", perfil?.correo, ultimo = true)
         }
         if (perfil != null && !perfil.correoConfirmado) {

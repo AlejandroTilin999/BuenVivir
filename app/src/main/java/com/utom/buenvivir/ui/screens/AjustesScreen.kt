@@ -47,6 +47,8 @@ fun AjustesScreen(
     onEscuchar: () -> Unit = {},
     onProbarRecordatorio: () -> Unit = {},
     onReiniciarDemo: () -> Unit = {},
+    mostrarDemo: Boolean = true,      // "Para la demostración" solo en el celular de la feria
+    puedeProbar: Boolean = true,      // sin medicinas no hay qué probar
     onAbrirOpcion: (String) -> Unit = {},
     onIrMedicinas: () -> Unit = {},
     onIrFamilia: () -> Unit = {}
@@ -184,11 +186,12 @@ fun AjustesScreen(
             }
 
             // ---------- Demostración ----------
-            Seccion("Para la demostración") {
+            // "Probar recordatorio" le sirve a cualquiera; "Reiniciar" solo en el celular de la feria
+            if (puedeProbar || mostrarDemo) Seccion(if (mostrarDemo) "Para la demostración" else "Probar") {
                 Tarjeta(arriba = 16, abajo = 16) {
-                    BotonContorno("Probar recordatorio en 1 minuto", Iconos.Campana, onProbarRecordatorio)
-                    Spacer(Modifier.height(10.dp))
-                    BotonContorno("Reiniciar demostración", Iconos.Reloj, onReiniciarDemo)
+                    if (puedeProbar) BotonContorno("Probar recordatorio en 1 minuto", Iconos.Campana, onProbarRecordatorio)
+                    if (puedeProbar && mostrarDemo) Spacer(Modifier.height(10.dp))
+                    if (mostrarDemo) BotonContorno("Reiniciar demostración", Iconos.Reloj, onReiniciarDemo)
                 }
             }
 
