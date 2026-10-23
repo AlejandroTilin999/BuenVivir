@@ -22,7 +22,8 @@ data class Medicina(
     val cantidad: String,
     val indicacion: String,
     val horarios: List<String>,
-    val video: String
+    val video: String,
+    val id: Long = 0          // id en la base del celular, para abrir su detalle
 )
 
 /** Alguien que acompaña al paciente: un familiar o su médico. */

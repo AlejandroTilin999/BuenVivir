@@ -126,7 +126,8 @@ fun calcularPanorama(
                 cantidad = m.medicina.cantidad,
                 indicacion = m.medicina.indicacion,
                 horarios = m.horarios.sortedBy { it.minutos }.map { horaTexto(it.minutos) },
-                video = m.medicina.video
+                video = m.medicina.video,
+                id = m.medicina.id
             )
         }
     )

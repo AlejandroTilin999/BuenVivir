@@ -30,6 +30,7 @@ import com.utom.buenvivir.data.Cuenta
 import com.utom.buenvivir.data.PacienteVinculado
 import com.utom.buenvivir.data.PerfilMedico
 import com.utom.buenvivir.data.Vinculos
+import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
@@ -111,6 +112,9 @@ fun MedicoApp(onSalir: () -> Unit) {
     var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Pacientes, 1 Mi perfil
     var vinculando by rememberSaveable { mutableStateOf(false) }
     var abierto by remember { mutableStateOf<PacienteVinculado?>(null) }
+    var recetando by remember { mutableStateOf(false) }       // M7 abierta para el paciente abierto
+    var guardando by remember { mutableStateOf(false) }
+    var avisoReceta by remember { mutableStateOf<AvisoMedico?>(null) }
     var perfil by remember { mutableStateOf<PerfilMedico?>(null) }
     val pacientes by remember { Vinculos.misPacientes() }.collectAsState(initial = null)
 
@@ -126,6 +130,7 @@ fun MedicoApp(onSalir: () -> Unit) {
     // Atrás: del detalle o de Vincular a la lista; de Mi perfil a Pacientes
     BackHandler(enabled = abierto != null || vinculando || pestana != 0) {
         when {
+            recetando -> { recetando = false; avisoReceta = null }
             abierto != null -> abierto = null
             vinculando -> vinculando = false
             else -> pestana = 0
@@ -133,9 +138,34 @@ fun MedicoApp(onSalir: () -> Unit) {
     }
 
     abierto?.let { p ->
+        if (recetando) {
+            RecetaScreen(
+                paciente = p.nombre,
+                medico = perfil?.nombre ?: "",
+                ocupado = guardando,
+                aviso = avisoReceta,
+                onRegresar = { recetando = false; avisoReceta = null },
+                onGuardar = { m ->
+                    if (!guardando) scope.launch {
+                        guardando = true
+                        avisoReceta = null
+                        when (val r = Recetas.guardar(p.id, m)) {
+                            Resultado.Bien -> {
+                                recetando = false
+                                Toast.makeText(context, "Listo, ${m.nombre} se le envió a ${p.nombre}", Toast.LENGTH_SHORT).show()
+                            }
+                            is Resultado.Mal -> avisoReceta = AvisoMedico(r.mensaje, esError = true)
+                        }
+                        guardando = false
+                    }
+                }
+            )
+            return
+        }
         DetallePacienteScreen(
             p = p,
             onRegresar = { abierto = null },
+            onAgregarMedicina = { recetando = true },
             onQuitar = {
                 scope.launch {
                     when (val r = Vinculos.desvincular(p.id)) {

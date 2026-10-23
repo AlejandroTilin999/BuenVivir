@@ -36,6 +36,75 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
         Nube.subirToma(toma, dao.medicina(horario.medicinaId)?.nombre ?: "")
     }
 
+    /**
+     * Las medicinas que estaban solo en el celular (como la de demostración) se suben a Firebase,
+     * para que su médico las vea. Se llama antes de empezar a escuchar la nube.
+     */
+    suspend fun subirSinNube() {
+        // Sin cuenta todavía (primera vez sin internet): se deja para la próxima vez que abra la app
+        val uid = Nube.miId() ?: return
+        dao.todasMedicinas().filter { it.nubeId.isEmpty() }.forEach { m ->
+            val id = Recetas.nuevoId()
+            val horarios = dao.horariosDe(m.id).sortedBy { it.minutos }.mapIndexed { i, h ->
+                val clave = h.clave.ifEmpty { "h$i" }
+                if (h.clave.isEmpty()) dao.actualizarHorario(h.copy(clave = clave))
+                HorarioNube(clave, h.minutos, h.indicacion)
+            }
+            dao.actualizarMedicina(m.copy(nubeId = id))
+            // Sin internet Firebase la guarda y la sube después
+            Recetas.coleccion(uid).document(id).set(
+                Recetas.datos(MedicinaNube(id, m.nombre, m.para, m.cantidad, m.indicacion, horarios, agregadaPor = SesionStore.PACIENTE))
+            )
+        }
+    }
+
+    /**
+     * Deja las medicinas del celular igual que las de Firebase: agrega las nuevas, corrige las que
+     * cambiaron y borra las que quitaron. Los horarios conservan su id, así no se pierde su historial.
+     * Regresa true si algo cambió (para volver a programar las alarmas).
+     */
+    suspend fun sincronizar(nube: List<MedicinaNube>): Boolean {
+        var cambio = false
+        val locales = dao.todasMedicinas()
+        val porNube = locales.filter { it.nubeId.isNotEmpty() }.associateBy { it.nubeId }
+
+        for (m in nube) {
+            val local = porNube[m.id]
+            val medicinaId = if (local == null) {
+                cambio = true
+                dao.insertarMedicina(
+                    MedicinaEntity(
+                        nombre = m.nombre, para = m.para, cantidad = m.cantidad, indicacion = m.indicacion,
+                        video = "¿Para qué sirve la ${m.nombre.lowercase()}?", nubeId = m.id
+                    )
+                )
+            } else {
+                val nueva = local.copy(nombre = m.nombre, para = m.para, cantidad = m.cantidad, indicacion = m.indicacion)
+                if (nueva != local) { dao.actualizarMedicina(nueva); cambio = true }
+                local.id
+            }
+
+            val actuales = dao.horariosDe(medicinaId).associateBy { it.clave }
+            for (h in m.horarios) {
+                val ya = actuales[h.clave]
+                if (ya == null) {
+                    dao.insertarHorario(HorarioEntity(medicinaId = medicinaId, minutos = h.minutos, indicacion = h.indicacion, clave = h.clave))
+                    cambio = true
+                } else if (ya.minutos != h.minutos || ya.indicacion != h.indicacion) {
+                    dao.actualizarHorario(ya.copy(minutos = h.minutos, indicacion = h.indicacion))
+                    cambio = true
+                }
+            }
+            val claves = m.horarios.map { it.clave }.toSet()
+            actuales.values.filter { it.clave !in claves }.forEach { dao.borrarHorario(it.id); cambio = true }
+        }
+
+        // Las que quitaron en la nube (solo las que ya estaban subidas)
+        val ids = nube.map { it.id }.toSet()
+        locales.filter { it.nubeId.isNotEmpty() && it.nubeId !in ids }.forEach { dao.borrarMedicina(it.id); cambio = true }
+        return cambio
+    }
+
     /** true si este celular ya se usó como paciente (tiene medicinas guardadas). */
     suspend fun tieneDatos() = dao.contarMedicinas() > 0
 

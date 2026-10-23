@@ -12,6 +12,12 @@ import com.utom.buenvivir.data.db.TomaEntity
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import java.util.Date
 
 /** Alguien que acompaña al paciente: su médico o un familiar (lo agregan con su código). */
@@ -27,6 +33,7 @@ data class MiembroEquipo(val id: String, val nombre: String, val rol: String, va
  *   pacientes/{uid}                      -> nombre, ultimaConexion
  *   pacientes/{uid}/tomas/{horario_fecha} -> medicina, fecha, hora, tomada, motivo, registradaEn
  *   pacientes/{uid}/equipo/{uidMedico}   -> rol, nombre, detalle, codigo, desde
+ *   pacientes/{uid}/medicinas/{id}       -> ver [MedicinaNube] (las agrega el médico, la familia o él)
  */
 object Nube {
     private const val TAG = "Nube"
@@ -116,6 +123,16 @@ object Nube {
         }
         awaitClose { registro?.remove() }
     }
+
+    /** El id del paciente en Firebase (entra si hace falta). null si no hay internet la primera vez. */
+    suspend fun miId(): String? = suspendCancellableCoroutine { c ->
+        conUsuario(alFallar = { if (c.isActive) c.resume(null) }) { uid -> if (c.isActive) c.resume(uid) }
+    }
+
+    /** Sus medicinas en Firebase, en vivo (las que le puso su médico, su familia o él mismo). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun escucharMisMedicinas(): Flow<List<MedicinaNube>?> =
+        flow { emit(miId()) }.flatMapLatest { uid -> if (uid == null) emptyFlow() else Recetas.escuchar(uid) }
 
     /** El paciente quita a alguien: ya no podrá ver sus tomas. */
     fun quitarDelEquipo(id: String) = conUsuario { uid ->

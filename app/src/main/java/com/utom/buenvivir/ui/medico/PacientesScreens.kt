@@ -32,6 +32,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.Busqueda
+import com.utom.buenvivir.data.MedicinaNube
+import com.utom.buenvivir.data.Recetas
+import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.data.PacienteVinculado
 import com.utom.buenvivir.data.TomaNube
 import com.utom.buenvivir.data.TomasPaciente
@@ -422,8 +425,13 @@ fun VincularScreen(onRegresar: () -> Unit, onVinculado: (String) -> Unit) {
 fun DetallePacienteScreen(
     p: PacienteVinculado,
     onRegresar: () -> Unit,
-    onQuitar: () -> Unit
+    onQuitar: () -> Unit,
+    onAgregarMedicina: () -> Unit = {}
 ) {
+    val scope = rememberCoroutineScope()
+    val medicinas by remember(p.id) { Recetas.escuchar(p.id) }.collectAsState(initial = null)
+    var porQuitar by remember { mutableStateOf<MedicinaNube?>(null) }
+    var errorMedicina by remember { mutableStateOf<String?>(null) }
     val hoy = LocalDate.now()
     val estado by remember(p.id) { Vinculos.tomas(p.id, desdeSemana(hoy)) }
         .collectAsState(initial = TomasPaciente.Cargando)
@@ -466,6 +474,11 @@ fun DetallePacienteScreen(
             }
         }
 
+        if (estado !is TomasPaciente.SinPermiso) {
+            Medicinas(medicinas, onQuitar = { porQuitar = it }, onAgregar = onAgregarMedicina)
+            errorMedicina?.let { Aviso(AvisoMedico(it, esError = true)) }
+        }
+
         OutlinedButton(
             onClick = { confirmar = true },
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -475,6 +488,36 @@ fun DetallePacienteScreen(
         ) {
             Text("Dejar de ver a este paciente", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
+    }
+
+    porQuitar?.let { m ->
+        AlertDialog(
+            onDismissRequest = { porQuitar = null },
+            title = { Text("¿Quitar ${m.nombre}?", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Text(
+                    "Se borra de las medicinas de ${p.nombre} y dejan de sonar sus alarmas.",
+                    fontSize = 17.sp,
+                    lineHeight = 24.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    porQuitar = null
+                    scope.launch {
+                        errorMedicina = (Recetas.quitar(p.id, m.id) as? Resultado.Mal)?.mensaje
+                    }
+                }) {
+                    Text("Sí, quitarla", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { porQuitar = null }) {
+                    Text("Cancelar", fontSize = 17.sp, color = TextoGris)
+                }
+            },
+            containerColor = Blanco
+        )
     }
 
     if (confirmar) {
@@ -652,6 +695,70 @@ private fun UltimasTomas(tomas: List<TomaNube>, hoy: LocalDate) {
                 }
                 if (t.tomada) Etiqueta("Tomada", Violeta, Blanco) else Etiqueta("No la tomó", GrisAviso, Blanco)
             }
+        }
+    }
+}
+
+// ---------- Medicinas del paciente ----------
+
+@Composable
+private fun Medicinas(lista: List<MedicinaNube>?, onQuitar: (MedicinaNube) -> Unit, onAgregar: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "Sus medicinas",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = TextoNormal,
+            modifier = Modifier.semantics { heading() }
+        )
+        when {
+            lista == null -> Cargando()
+            lista.isEmpty() -> Text("Todavía no tiene medicinas.", fontSize = 17.sp, color = TextoSecundario)
+            else -> lista.forEach { m ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(2.dp, BordeTarjeta, RoundedCornerShape(18.dp))
+                        .padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(m.nombre, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
+                        Text("${m.cantidad} ${m.indicacion}", fontSize = 15.sp, color = TextoSecundario)
+                        Text(
+                            m.horarios.joinToString(" · ") { horaTexto(it.minutos) },
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextoChip
+                        )
+                    }
+                    Text(
+                        "Quitar",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextoChip,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(role = Role.Button) { onQuitar(m) }
+                            .padding(horizontal = 10.dp, vertical = 12.dp)
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(AzulBoton)
+                .clickable(role = Role.Button, onClick = onAgregar),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(Iconos.Mas, contentDescription = null, tint = Blanco, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Agregar medicina", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = Blanco)
         }
     }
 }

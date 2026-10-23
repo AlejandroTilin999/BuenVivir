@@ -1,5 +1,6 @@
 package com.utom.buenvivir.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -15,7 +16,9 @@ data class MedicinaEntity(
     val para: String,           // "Para controlar el azúcar"
     val cantidad: String,       // "1 pastilla blanca"
     val indicacion: String,     // "después del desayuno y después de la cena"
-    val video: String           // título del video de la medicina
+    val video: String,          // título del video de la medicina
+    // Id de esta medicina en Firebase (pacientes/{uid}/medicinas/{nubeId}); vacío si aún no se sube
+    @ColumnInfo(defaultValue = "") val nubeId: String = ""
 )
 
 /** Cada hora en que toca una medicina. [minutos] es la hora del día: 8:00 p. m. = 1200. */
@@ -33,7 +36,9 @@ data class HorarioEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val medicinaId: Long,
     val minutos: Int,
-    val indicacion: String      // "después de cenar"
+    val indicacion: String,     // "después de cenar"
+    // Cómo se llama este horario en Firebase ("h0", "h1"...), para no perder su historial al editarlo
+    @ColumnInfo(defaultValue = "") val clave: String = ""
 )
 
 /**

@@ -109,6 +109,12 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
         Nube.entrar(Repositorio.nombrePaciente)
         repo.prepararSiVacia()
         Programador.programarTodas(context)
+        // Las medicinas que estaban solo en el celular se suben, y después se escucha la nube:
+        // si su médico o su familia le agregan o cambian una medicina, aquí aparece sola con sus alarmas
+        repo.subirSinNube()
+        Nube.escucharMisMedicinas().collect { lista ->
+            if (lista != null && repo.sincronizar(lista)) Programador.programarTodas(context)
+        }
     }
 
     // Permiso para mostrar notificaciones (Android 13 en adelante lo pide al usuario)
@@ -132,7 +138,9 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     val hoy = ahora.toLocalDate()
     val lunes = hoy.minusDays(hoy.dayOfWeek.value - 1L)
     val tomas by remember(lunes) { repo.tomasDesde(lunes) }.collectAsState(initial = emptyList())
-    val medicinaId = meds.firstOrNull()?.medicina?.id
+    // La medicina que se abrió en "Mis medicinas" (si no hay, la primera)
+    var abiertaId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val medicinaId = meds.firstOrNull { it.medicina.id == abiertaId }?.medicina?.id ?: meds.firstOrNull()?.medicina?.id
     val ultimas by remember(medicinaId) {
         if (medicinaId == null) flowOf(emptyList()) else repo.ultimasTomas(medicinaId)
     }.collectAsState(initial = emptyList())
@@ -184,7 +192,7 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
         avisar("Tu respuesta se guardó")
     }
 
-    val medicina = p.medicinas.first()
+    val medicina = p.medicinas.firstOrNull { it.id == medicinaId } ?: p.medicinas.first()
     val historial = historialDe(ultimas, p.hoy)
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -196,7 +204,7 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
                 tomasHoy = p.tomasHoy,
                 medicinas = p.medicinas,
                 onEscuchar = { lector.leer(textoMedicinas(p)) },
-                onAbrirMedicina = { pestana = 3 },
+                onAbrirMedicina = { abiertaId = it.id; pestana = 3 },
                 onIrInicio = { pestana = 0 },
                 onIrFamilia = { pestana = 2 }
             )

@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -54,4 +55,28 @@ interface BuenVivirDao {
 
     @Query("DELETE FROM tomas")
     suspend fun borrarTomas()
+
+    // ---- Para copiar las medicinas que vienen de Firebase (receta del médico) ----
+
+    @Query("SELECT * FROM medicinas")
+    suspend fun todasMedicinas(): List<MedicinaEntity>
+
+    @Query("SELECT * FROM horarios WHERE medicinaId = :medicinaId")
+    suspend fun horariosDe(medicinaId: Long): List<HorarioEntity>
+
+    @Update
+    suspend fun actualizarMedicina(medicina: MedicinaEntity)
+
+    @Update
+    suspend fun actualizarHorario(horario: HorarioEntity)
+
+    @Insert
+    suspend fun insertarHorario(horario: HorarioEntity): Long
+
+    @Query("DELETE FROM horarios WHERE id = :id")
+    suspend fun borrarHorario(id: Long)
+
+    /** Sus horarios se borran solos (CASCADE). */
+    @Query("DELETE FROM medicinas WHERE id = :id")
+    suspend fun borrarMedicina(id: Long)
 }
