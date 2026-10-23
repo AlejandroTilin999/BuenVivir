@@ -161,9 +161,15 @@ object Nube {
 
     /** Al abrir la app: entra y guarda el nombre del paciente. */
     fun entrar(nombre: String) = conUsuario { uid ->
-        db.collection("pacientes").document(uid)
-            .set(mapOf("nombre" to nombre, "ultimaConexion" to Timestamp.now()), SetOptions.merge())
+        val paciente = db.collection("pacientes").document(uid)
+        paciente.set(mapOf("nombre" to nombre, "ultimaConexion" to Timestamp.now()), SetOptions.merge())
             .addOnFailureListener { Log.w(TAG, "No se pudo guardar el paciente", it) }
+        // Si ya tiene código, también se actualiza ahí (es lo que ve quien lo busca para vincularse)
+        paciente.get().addOnSuccessListener { doc ->
+            doc.getString("codigo")?.let { codigo ->
+                db.collection("codigos").document(codigo).set(mapOf("nombre" to nombre), SetOptions.merge())
+            }
+        }
     }
 
     /** Sube una toma. Un documento por horario y día: si corrige su respuesta, se reemplaza. */

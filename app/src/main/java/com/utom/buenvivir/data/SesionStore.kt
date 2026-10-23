@@ -14,6 +14,14 @@ private val Context.sesionStore by preferencesDataStore(name = "sesion")
 class SesionStore(private val context: Context) {
 
     private val clave = stringPreferencesKey("rol")
+    private val claveNombre = stringPreferencesKey("nombre")
+
+    /** El nombre del paciente ("Don José"), o null si todavía no lo escribe. */
+    val nombre: Flow<String?> = context.sesionStore.data.map { it[claveNombre] }
+
+    suspend fun guardarNombre(nombre: String) {
+        context.sesionStore.edit { it[claveNombre] = nombre }
+    }
 
     /** El rol guardado, o null si todavía no se elige. */
     val rol: Flow<String?> = context.sesionStore.data.map { it[clave] }

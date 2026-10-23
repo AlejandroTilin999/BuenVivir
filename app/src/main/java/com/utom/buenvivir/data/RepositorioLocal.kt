@@ -117,7 +117,7 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
     suspend fun reiniciarDemo() {
         dao.borrarTomas()
         val hs = dao.horarios()
-        val demo = if (hs.size >= 2) cargarDemo(hs[0].medicinaId, hs[0].id, hs[1].id) else emptyList()
+        val demo = cargarDemo(hs)
         Nube.reemplazarTomas(conNombre(demo))
     }
 
@@ -150,14 +150,17 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
                 HorarioEntity(medicinaId = medicinaId, minutos = 20 * 60, indicacion = "después de cenar")
             )
         )
-        if (CARGAR_DEMO) Nube.reemplazarTomas(conNombre(cargarDemo(medicinaId, idsHorarios[0], idsHorarios[1])))
+        if (CARGAR_DEMO) Nube.reemplazarTomas(conNombre(cargarDemo(dao.horarios())))
     }
 
     /**
-     * Semana de DEMOSTRACIÓN para la feria (no son datos reales): los últimos 6 días tomadas,
-     * menos una mañana ("No tenía la medicina") y una noche ("Se me olvidó"). Hoy queda pendiente.
+     * Semana de DEMOSTRACIÓN para la feria (no son datos reales): los últimos 6 días, cada horario
+     * de cada medicina con su hora correcta, todas tomadas menos dos ("No tenía la medicina" y
+     * "Se me olvidó"). Hoy queda pendiente, para que siempre aparezca "Tomar pastilla".
      */
-    private suspend fun cargarDemo(medicinaId: Long, manana: Long, noche: Long): List<TomaEntity> {
+    private suspend fun cargarDemo(horarios: List<HorarioEntity>): List<TomaEntity> {
+        if (horarios.isEmpty()) return emptyList()
+        val hs = horarios.sortedBy { it.minutos }
         val hoy = LocalDate.now()
         // Hora real de ejemplo: unos minutos después de la hora que tocaba
         fun registro(fecha: LocalDate, minutos: Int, retraso: Int): Long =
@@ -165,21 +168,20 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
         val tomas = mutableListOf<TomaEntity>()
         for (diasAtras in 6 downTo 1) {
             val dia = hoy.minusDays(diasAtras.toLong())
-            val fecha = dia.toString()
-            val faltoManana = diasAtras == 6
-            val faltoNoche = diasAtras == 1
-            tomas += TomaEntity(
-                medicinaId = medicinaId, horarioId = manana, fecha = fecha, minutos = 8 * 60,
-                tomada = !faltoManana, motivo = if (faltoManana) "No tenía la medicina" else null,
-                registradaEn = registro(dia, 8 * 60, 5 + diasAtras * 3)
-            )
-            tomas += TomaEntity(
-                medicinaId = medicinaId, horarioId = noche, fecha = fecha, minutos = 20 * 60,
-                tomada = !faltoNoche, motivo = if (faltoNoche) "Se me olvidó" else null,
-                registradaEn = registro(dia, 20 * 60, 10 + diasAtras * 4)
-            )
+            hs.forEachIndexed { i, h ->
+                // Falla la primera toma de hace 6 días y la última de ayer
+                val motivo = when {
+                    diasAtras == 6 && i == 0 -> "No tenía la medicina"
+                    diasAtras == 1 && i == hs.lastIndex -> "Se me olvidó"
+                    else -> null
+                }
+                tomas += TomaEntity(
+                    medicinaId = h.medicinaId, horarioId = h.id, fecha = dia.toString(), minutos = h.minutos,
+                    tomada = motivo == null, motivo = motivo,
+                    registradaEn = registro(dia, h.minutos, 5 + diasAtras * 3 + i * 2)
+                )
+            }
         }
-        // Hoy queda sin registrar, para que al reiniciar siempre aparezca "Tomar pastilla"
         dao.guardarTomas(tomas)
         return tomas
     }

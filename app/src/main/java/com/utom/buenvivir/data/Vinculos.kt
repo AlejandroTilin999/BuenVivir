@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -134,20 +135,48 @@ object Vinculos {
         Resultado.Mal(Cuenta.mensajeDe(e))
     }
 
-    /** Su lista de pacientes, en vivo. null mientras carga. */
+    /**
+     * Su lista de pacientes, en vivo. null mientras carga.
+     * El nombre se lee del paciente mismo: si lo cambia en su app, aquí se actualiza solo.
+     */
     fun misPacientes(): Flow<List<PacienteVinculado>?> = callbackFlow {
         trySend(null)
+        var lista = emptyList<PacienteVinculado>()
+        val nombres = mutableMapOf<String, String>()
+        val escuchas = mutableMapOf<String, ListenerRegistration>()
+
+        fun enviar() {
+            trySend(lista.map { p -> p.copy(nombre = nombres[p.id] ?: p.nombre) }.sortedBy { it.nombre })
+        }
+
         val registro = miLista().addSnapshotListener { snap, _ ->
             snap ?: return@addSnapshotListener
-            trySend(snap.documents.map {
+            lista = snap.documents.map {
                 PacienteVinculado(
                     id = it.id,
                     nombre = it.getString("nombre") ?: "Paciente",
                     desde = it.getTimestamp("desde")?.toDate()?.time ?: 0L
                 )
-            }.sortedBy { it.nombre })
+            }
+            val ids = lista.map { it.id }.toSet()
+            // Deja de escuchar a los que ya no están
+            (escuchas.keys - ids).forEach { id -> escuchas.remove(id)?.remove(); nombres.remove(id) }
+            // Escucha el nombre de los nuevos
+            ids.filter { it !in escuchas }.forEach { id ->
+                escuchas[id] = db.collection("pacientes").document(id).addSnapshotListener { doc, _ ->
+                    val nombre = doc?.getString("nombre")
+                    if (!nombre.isNullOrBlank() && nombres[id] != nombre) {
+                        nombres[id] = nombre
+                        enviar()
+                    }
+                }
+            }
+            enviar()
         }
-        awaitClose { registro.remove() }
+        awaitClose {
+            registro.remove()
+            escuchas.values.forEach { it.remove() }
+        }
     }
 
     /** Las tomas del paciente desde [desde], en vivo: si marca "No me la tomé", aparece al instante. */

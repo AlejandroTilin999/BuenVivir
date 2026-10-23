@@ -25,6 +25,27 @@ import com.utom.buenvivir.data.db.MedicinaEntity
 import com.utom.buenvivir.data.horaTexto
 import java.time.LocalDate
 
+/**
+ * Los tonos que puede elegir el paciente. Son los tonos que ya trae su celular
+ * (el de alarma, el de llamada y el de mensajes), así siempre existen.
+ */
+object Tonos {
+    val opciones = listOf("Alarma", "Timbre", "Aviso")
+
+    fun uri(nombre: String): android.net.Uri? {
+        val tipo = when (nombre) {
+            "Timbre" -> RingtoneManager.TYPE_RINGTONE
+            "Aviso" -> RingtoneManager.TYPE_NOTIFICATION
+            else -> RingtoneManager.TYPE_ALARM
+        }
+        return RingtoneManager.getDefaultUri(tipo)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+    }
+
+    /** "Campanita" (el valor de antes) o cualquier otro desconocido cuenta como "Alarma". */
+    fun valido(nombre: String) = if (nombre in opciones) nombre else opciones.first()
+}
+
 /** La notificación de "hora de tu pastilla", con sus botones. */
 object Notificaciones {
     const val ACCION_TOMADA = "com.utom.buenvivir.TOMADA"
@@ -64,7 +85,7 @@ object Notificaciones {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notificacion = NotificationCompat.Builder(context, canal(context, ajustes.sonido, ajustes.vibracion))
+        val notificacion = NotificationCompat.Builder(context, canal(context, ajustes.sonido, ajustes.vibracion, Tonos.valido(ajustes.tono)))
             .setSmallIcon(R.drawable.ic_pastilla)
             .setColor(0xFF004EE0.toInt())
             .setContentTitle("Hora de tu ${m.nombre}")
@@ -112,13 +133,12 @@ object Notificaciones {
     private val manejador = Handler(Looper.getMainLooper())
     private val detenerPrueba = Runnable { prueba?.stop(); prueba = null }
 
-    /** Suena el tono de alarma unos 2 segundos con el volumen elegido, para que lo escuche. */
-    fun probarVolumen(context: Context, nivel: Int) {
+    /** Suena el tono unos 2 segundos con el volumen elegido, para que lo escuche. */
+    fun probarVolumen(context: Context, nivel: Int, nombreTono: String = Tonos.opciones.first()) {
         manejador.removeCallbacks(detenerPrueba)
         prueba?.stop()
         ajustarVolumen(context, nivel)
-        val tono = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val tono = Tonos.uri(Tonos.valido(nombreTono))
         prueba = RingtoneManager.getRingtone(context.applicationContext, tono)?.apply {
             audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
@@ -135,10 +155,12 @@ object Notificaciones {
 
     /**
      * Android no deja cambiar el sonido de un canal ya creado, así que hay un canal
-     * por cada combinación de Ajustes (sonido sí/no, vibración sí/no).
+     * por cada combinación de Ajustes (sonido sí/no, vibración sí/no y tono).
      */
-    private fun canal(context: Context, sonido: Boolean, vibracion: Boolean): String {
-        val id = "pastillas_" + (if (sonido) "s" else "x") + (if (vibracion) "v" else "x")
+    private fun canal(context: Context, sonido: Boolean, vibracion: Boolean, tono: String): String {
+        // El tono "Alarma" conserva el nombre de canal de antes
+        val sufijoTono = if (!sonido || tono == "Alarma") "" else "_" + tono.lowercase()
+        val id = "pastillas_" + (if (sonido) "s" else "x") + (if (vibracion) "v" else "x") + sufijoTono
         val nm = context.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(id) == null) {
             val nombre = "Recordatorios de pastillas" + when {
@@ -150,10 +172,8 @@ object Notificaciones {
             val c = NotificationChannel(id, nombre, NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Te avisa cuando toca tomar una pastilla"
                 if (sonido) {
-                    val tono = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                     setSound(
-                        tono,
+                        Tonos.uri(tono),
                         AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ALARM)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)

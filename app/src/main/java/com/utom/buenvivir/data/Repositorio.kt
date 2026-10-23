@@ -33,7 +33,7 @@ data class Contacto(val nombre: String, val relacion: String)
 data class Ajustes(
     val sonido: Boolean = true,
     val vibracion: Boolean = true,
-    val tono: String = "Campanita",
+    val tono: String = "Alarma",
     val repetirMinutos: Int = 10,
     val volumen: Int = 2,            // 0 Bajo, 1 Medio, 2 Alto
     val avisarEnReloj: Boolean = true,

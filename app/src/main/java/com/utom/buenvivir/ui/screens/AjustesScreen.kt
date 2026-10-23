@@ -104,7 +104,7 @@ fun AjustesScreen(
                     Divisor()
                     FilaInterruptor("Vibración", ajustes.vibracion) { onCambiar(ajustes.copy(vibracion = it)) }
                     Divisor()
-                    FilaOpcion("Tono", ajustes.tono) { onAbrirOpcion("tono") }
+                    FilaOpcion("Tono", com.utom.buenvivir.alarmas.Tonos.valido(ajustes.tono)) { onAbrirOpcion("tono") }
                     Divisor()
                     // Cada toque cambia: 5 → 10 → 15 → 5 minutos
                     FilaOpcion("Repetir si no respondo", "Cada ${ajustes.repetirMinutos} min") {

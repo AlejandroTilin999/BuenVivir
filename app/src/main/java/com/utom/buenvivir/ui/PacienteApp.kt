@@ -58,6 +58,16 @@ import com.utom.buenvivir.ui.screens.InicioScreen
 import com.utom.buenvivir.ui.screens.MedicinasScreen
 import com.utom.buenvivir.ui.screens.MotivoSheet
 import com.utom.buenvivir.ui.screens.SinMedicinasScreen
+import com.utom.buenvivir.ui.screens.NombreScreen
+import com.utom.buenvivir.ui.screens.TonoScreen
+import com.utom.buenvivir.ui.screens.MiMedicoScreen
+import com.utom.buenvivir.ui.screens.PrivacidadScreen
+import com.utom.buenvivir.ui.screens.AyudaScreen
+import com.utom.buenvivir.ui.screens.AcercaDeScreen
+import com.utom.buenvivir.ui.screens.TEXTO_PRIVACIDAD
+import com.utom.buenvivir.ui.screens.TEXTO_AYUDA
+import com.utom.buenvivir.ui.screens.TEXTO_ACERCA
+import com.utom.buenvivir.alarmas.Tonos
 import com.utom.buenvivir.ui.theme.AzulMarino
 import com.utom.buenvivir.ui.theme.Blanco
 import kotlinx.coroutines.delay
@@ -67,7 +77,12 @@ private const val DURACION_AVISO_MS = 5_000L
 
 /** Flujo del rol paciente. Las medicinas, las tomas y los ajustes se guardan en el celular. */
 @Composable
-fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) {
+fun PacienteApp(
+    nombre: String,
+    onCambiarNombre: (String) -> Unit = {},
+    abrirMotivo: Boolean = false,
+    onMotivoAbierto: () -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val lector = rememberLector()
@@ -78,7 +93,7 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     var mostrarAviso by remember { mutableStateOf(false) }
     var avisos by remember { mutableIntStateOf(0) }
     var textoAviso by remember { mutableStateOf("Tu respuesta se guardó") }
-    var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Inicio, 1 Mis medicinas, 2 Mi familia, 3 Detalle, 4 Ajustes, 5 Mi código
+    var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Inicio, 1 Mis medicinas, 2 Mi familia, 3 Detalle, 4 Ajustes, 5 Mi código, 6 Mi nombre
 
     // Su médico y su familia, en vivo desde Firebase
     val equipo by remember { Nube.escucharEquipo() }.collectAsState(initial = emptyList())
@@ -89,7 +104,7 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     LaunchedEffect(pestana, intentosCodigo) {
         if (pestana == 5 && estadoCodigo !is EstadoCodigo.Listo) {
             estadoCodigo = EstadoCodigo.Cargando
-            Nube.miCodigo(Repositorio.nombrePaciente) { codigo ->
+            Nube.miCodigo(nombre) { codigo ->
                 estadoCodigo = if (codigo != null) EstadoCodigo.Listo(codigo) else EstadoCodigo.Error
             }
         }
@@ -104,10 +119,11 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
         }
     }
 
+    // Entra a Firebase como usuario anónimo (la primera vez crea su cuenta) y guarda su nombre
+    LaunchedEffect(nombre) { Nube.entrar(nombre) }
+
     // Datos guardados
     LaunchedEffect(Unit) {
-        // Entra a Firebase como usuario anónimo (la primera vez crea su cuenta)
-        Nube.entrar(Repositorio.nombrePaciente)
         repo.prepararSiVacia()
         Programador.programarTodas(context)
         // Las medicinas que estaban solo en el celular se suben, y después se escucha la nube:
@@ -168,6 +184,7 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
         pestana = when (pestana) {
             3 -> 1 // del detalle, a Mis medicinas
             5 -> 2 // de Mi código, a Mi familia
+            in 6..11 -> 4 // de Mi nombre, Tono, Mi médico, Privacidad, Ayuda o Acerca de, a Ajustes
             else -> 0
         }
     }
@@ -178,6 +195,52 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     // Mientras se carga la base de datos la primera vez (es un instante)
     if (medsCargadas == null) {
         Box(Modifier.fillMaxSize().background(Blanco))
+        return
+    }
+
+    // Ajustes → Mi perfil: cambiar su nombre
+    if (pestana == 6) {
+        NombreScreen(
+            inicial = nombre,
+            editando = true,
+            onRegresar = { pestana = 4 },
+            onListo = { onCambiarNombre(it); pestana = 4 }
+        )
+        return
+    }
+
+    // Pantallas que se abren desde Ajustes
+    if (pestana in 7..11) {
+        val alAjustes = { pestana = 4 }
+        when (pestana) {
+            7 -> TonoScreen(
+                elegido = Tonos.valido(ajustes.tono),
+                opciones = Tonos.opciones,
+                onElegir = { t ->
+                    scope.launch { store.guardar(ajustes.copy(tono = t)) }
+                    Notificaciones.probarVolumen(context, ajustes.volumen, t) // suena para que lo escuche
+                },
+                onRegresar = alAjustes,
+                onEscuchar = {
+                    lector.leer("Tono. Toca un tono para escucharlo. Las opciones son: " + Tonos.opciones.joinToString(", ") + ".")
+                }
+            )
+            8 -> MiMedicoScreen(
+                equipo = equipo,
+                onVerCodigo = { pestana = 5 },
+                onRegresar = alAjustes,
+                onEscuchar = {
+                    val medicos = equipo.filter { it.esMedico }
+                    lector.leer(
+                        if (medicos.isEmpty()) "Todavía no tienes médico en la app. Dale tu código para que pueda ver tus tomas."
+                        else "Tu médico: " + medicos.joinToString(" y ") { it.nombre } + "."
+                    )
+                }
+            )
+            9 -> PrivacidadScreen(onRegresar = alAjustes, onEscuchar = { lector.leer(TEXTO_PRIVACIDAD) })
+            10 -> AyudaScreen(onRegresar = alAjustes, onEscuchar = { lector.leer(TEXTO_AYUDA) })
+            else -> AcercaDeScreen(onRegresar = alAjustes, onEscuchar = { lector.leer(TEXTO_ACERCA) })
+        }
         return
     }
 
@@ -205,20 +268,21 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
                 )
                 4 -> AjustesScreen(
                     ajustes = ajustes,
-                    nombre = Repositorio.nombrePaciente,
+                    nombre = nombre,
                     relojNombre = Repositorio.relojNombre,
                     relojConectado = Repositorio.relojConectado,
                     onCambiar = { nuevos -> scope.launch { store.guardar(nuevos) } },
-                    onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel) },
+                    onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel, ajustes.tono) },
                     onRegresar = { pestana = 0 },
                     onEscuchar = { lector.leer(textoAjustes(ajustes)) },
+                    onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
                     mostrarDemo = false,
                     puedeProbar = false,
                     onIrMedicinas = { pestana = 0 },
                     onIrFamilia = { pestana = 2 }
                 )
                 else -> SinMedicinasScreen(
-                    nombre = Repositorio.nombrePaciente,
+                    nombre = nombre,
                     onEscuchar = {
                         lector.leer(
                             "Todavía no tienes medicinas. Dale tu código a tu médico. " +
@@ -296,13 +360,14 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
             )
             4 -> AjustesScreen(
                 ajustes = ajustes,
-                nombre = Repositorio.nombrePaciente,
+                nombre = nombre,
                 relojNombre = Repositorio.relojNombre,
                 relojConectado = Repositorio.relojConectado,
                 onCambiar = { nuevos -> scope.launch { store.guardar(nuevos) } },
-                onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel) },
+                onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel, ajustes.tono) },
                 onRegresar = { pestana = 0 },
                 onEscuchar = { lector.leer(textoAjustes(ajustes)) },
+                    onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
                 onProbarRecordatorio = {
                     Programador.programarPrueba(context, p.horario.id, p.hoy)
                     avisar("Sonará en 1 minuto")
@@ -317,14 +382,14 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
                 onIrFamilia = { pestana = 2 }
             )
             else -> InicioScreen(
-                nombre = Repositorio.nombrePaciente,
+                nombre = nombre,
                 tomadas = p.tomadasHoy,
                 total = p.totalHoy,
                 toma = p.toma,
                 estado = p.estado,
                 horaTomada = p.horaTomada,
                 siguiente = p.siguiente,
-                onEscuchar = { lector.leer(textoInicio(p)) },
+                onEscuchar = { lector.leer(textoInicio(p, nombre)) },
                 onTomar = { registrar(tomada = true, motivo = null) },
                 onNoTomada = { mostrarMotivo = true },
                 onIrMedicinas = { pestana = 1 },
@@ -376,18 +441,29 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     }
 }
 
+/** Qué pantalla abre cada opción de Ajustes (null = no abre nada). */
+private fun pestanaDeOpcion(opcion: String): Int? = when (opcion) {
+    "Mi perfil" -> 6
+    "tono" -> 7
+    "Mi médico" -> 8
+    "Privacidad" -> 9
+    "Ayuda" -> 10
+    "Acerca de BuenVivir" -> 11
+    else -> null
+}
+
 /** Deletreado y despacio: "Tu código es: K, 7, M. 2, Q, 9." */
 private fun textoCodigo(codigo: String): String =
     "Tu código es: " + codigo.chunked(3).joinToString(". ") { it.toList().joinToString(", ") } + "."
 
 /** Lo que se lee en la tarjeta de la pastilla, según cómo va la toma. */
-private fun textoInicio(p: Panorama): String {
+private fun textoInicio(p: Panorama, nombre: String): String {
     val t = p.toma
     val s = p.siguiente
     val despues = "Tu siguiente pastilla es ${s.medicina}, ${s.cuando.replaceFirstChar { it.lowercase() }}."
     return when (val e = p.estado) {
         EstadoToma.Pendiente ->
-            "${Repositorio.nombrePaciente}, ahora te toca ${t.medicina}, ${t.para.replaceFirstChar { it.lowercase() }}. " +
+            "${nombre}, ahora te toca ${t.medicina}, ${t.para.replaceFirstChar { it.lowercase() }}. " +
                 "Tómate ${t.cantidad} ${t.indicacion}, a las ${t.hora}."
         EstadoToma.Tomada -> "Ya te tomaste la ${t.medicina}. $despues"
         is EstadoToma.Omitida -> "No te tomaste la ${t.medicina}. El motivo fue: ${e.motivo}. $despues"

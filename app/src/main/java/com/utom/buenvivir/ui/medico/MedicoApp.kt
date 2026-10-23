@@ -153,7 +153,8 @@ private fun PantallasMedico(onSalir: () -> Unit) {
         }
     }
 
-    abierto?.let { p ->
+    // Con el nombre al día, por si el paciente lo cambió mientras estaba abierto
+    abierto?.let { a -> pacientes?.firstOrNull { it.id == a.id } ?: a }?.let { p ->
         if (recetando) {
             RecetaScreen(
                 paciente = p.nombre,

@@ -15,6 +15,7 @@ import com.utom.buenvivir.ui.medico.AccesoMedico
 import com.utom.buenvivir.ui.medico.MedicoApp
 import com.utom.buenvivir.ui.screens.RolElegido
 import com.utom.buenvivir.ui.screens.RolScreen
+import com.utom.buenvivir.ui.screens.NombreScreen
 import com.utom.buenvivir.ui.theme.Blanco
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -31,6 +32,7 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
     val scope = rememberCoroutineScope()
     val sesion = remember { SesionStore(context) }
     val rol by sesion.rol.collectAsState(initial = CARGANDO)
+    val nombre by sesion.nombre.collectAsState(initial = CARGANDO)
     var revisado by remember { mutableStateOf(false) }
     // Médico o familiar que todavía no inicia sesión (los dos usan correo y contraseña)
     var entrandoComo by rememberSaveable { mutableStateOf<String?>(null) }
@@ -43,15 +45,31 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
         ) {
             sesion.guardarRol(SesionStore.PACIENTE)
         }
+        // El celular de la demostración ya era de Don José antes de que se pidiera el nombre
+        if (sesion.rol.first() == SesionStore.PACIENTE && sesion.nombre.first() == null &&
+            RepositorioLocal.get(context).tieneDatos()
+        ) {
+            sesion.guardarNombre("Don José")
+        }
         revisado = true
     }
 
     fun guardar(nuevo: String?) = scope.launch { sesion.guardarRol(nuevo) }
 
     when {
-        !revisado || rol == CARGANDO -> Box(Modifier.fillMaxSize().background(Blanco))
+        !revisado || rol == CARGANDO || nombre == CARGANDO -> Box(Modifier.fillMaxSize().background(Blanco))
 
-        rol == SesionStore.PACIENTE -> PacienteApp(abrirMotivo, onMotivoAbierto)
+        // Paciente nuevo: primero escribe su nombre
+        rol == SesionStore.PACIENTE && nombre == null -> NombreScreen(
+            onListo = { scope.launch { sesion.guardarNombre(it) } }
+        )
+
+        rol == SesionStore.PACIENTE -> PacienteApp(
+            nombre = nombre!!,
+            onCambiarNombre = { scope.launch { sesion.guardarNombre(it) } },
+            abrirMotivo = abrirMotivo,
+            onMotivoAbierto = onMotivoAbierto
+        )
 
         // El familiar usa las mismas pantallas del médico (ver tomas, vincular, agregar medicinas)
         rol == SesionStore.MEDICO || rol == SesionStore.FAMILIAR -> MedicoApp(
