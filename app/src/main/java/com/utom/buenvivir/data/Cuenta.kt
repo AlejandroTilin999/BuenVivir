@@ -119,7 +119,7 @@ object Cuenta {
     fun salir() = auth.signOut()
 
     /** Convierte el error de Firebase en un mensaje que se entienda. */
-    private fun mensajeDe(e: Exception): String = when (e) {
+    internal fun mensajeDe(e: Exception): String = when (e) {
         is FirebaseNetworkException -> "Revisa tu conexión a internet."
         is FirebaseTooManyRequestsException -> "Hiciste muchos intentos. Espera unos minutos e intenta otra vez."
         is FirebaseAuthException -> when (e.errorCode) {

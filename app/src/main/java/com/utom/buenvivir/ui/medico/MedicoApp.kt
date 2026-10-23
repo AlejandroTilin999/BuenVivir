@@ -27,7 +27,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.Cuenta
+import com.utom.buenvivir.data.PacienteVinculado
 import com.utom.buenvivir.data.PerfilMedico
+import com.utom.buenvivir.data.Vinculos
 import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
@@ -101,12 +103,16 @@ fun AccesoMedico(onEntro: () -> Unit, onCambiarRol: () -> Unit) {
     }
 }
 
-/** Ya dentro: Mis pacientes (M4) y Mi perfil. */
+/** Ya dentro: Mis pacientes (M4), Vincular (M5), Detalle (M6) y Mi perfil. */
 @Composable
 fun MedicoApp(onSalir: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Pacientes, 1 Mi perfil
+    var vinculando by rememberSaveable { mutableStateOf(false) }
+    var abierto by remember { mutableStateOf<PacienteVinculado?>(null) }
     var perfil by remember { mutableStateOf<PerfilMedico?>(null) }
+    val pacientes by remember { Vinculos.misPacientes() }.collectAsState(initial = null)
 
     LaunchedEffect(Unit) {
         // Si la sesión se cerró por fuera (por ejemplo, se borró la cuenta), regresa a elegir rol
@@ -117,7 +123,44 @@ fun MedicoApp(onSalir: () -> Unit) {
         perfil = Cuenta.miPerfil()
     }
 
-    BackHandler(enabled = pestana != 0) { pestana = 0 }
+    // Atrás: del detalle o de Vincular a la lista; de Mi perfil a Pacientes
+    BackHandler(enabled = abierto != null || vinculando || pestana != 0) {
+        when {
+            abierto != null -> abierto = null
+            vinculando -> vinculando = false
+            else -> pestana = 0
+        }
+    }
+
+    abierto?.let { p ->
+        DetallePacienteScreen(
+            p = p,
+            onRegresar = { abierto = null },
+            onQuitar = {
+                scope.launch {
+                    when (val r = Vinculos.desvincular(p.id)) {
+                        Resultado.Bien -> {
+                            abierto = null
+                            Toast.makeText(context, "Ya no ves a ${p.nombre}", Toast.LENGTH_SHORT).show()
+                        }
+                        is Resultado.Mal -> Toast.makeText(context, r.mensaje, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        )
+        return
+    }
+
+    if (vinculando) {
+        VincularScreen(
+            onRegresar = { vinculando = false },
+            onVinculado = { nombre ->
+                vinculando = false
+                Toast.makeText(context, "Listo, ya ves a $nombre", Toast.LENGTH_SHORT).show()
+            }
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -129,75 +172,13 @@ fun MedicoApp(onSalir: () -> Unit) {
                 1 -> PerfilMedicoScreen(perfil, onSalir)
                 else -> PacientesScreen(
                     nombre = perfil?.nombre ?: "",
-                    onVincular = {
-                        // Paso 2: aquí se abre "Vincular paciente"
-                        Toast.makeText(context, "Vincular paciente llega en el siguiente paso", Toast.LENGTH_SHORT).show()
-                    }
+                    pacientes = pacientes,
+                    onVincular = { vinculando = true },
+                    onAbrir = { abierto = it }
                 )
             }
         }
         MenuMedico(seleccionado = pestana, onPacientes = { pestana = 0 }, onPerfil = { pestana = 1 })
-    }
-}
-
-/** M4: por ahora sin pacientes; la lista llega con "Vincular". */
-@Composable
-fun PacientesScreen(nombre: String, onVincular: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .background(Lavanda)
-                .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(saludo(), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TextoLavanda)
-            Text(
-                nombre,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = TextoOscuro,
-                letterSpacing = (-0.5).sp,
-                modifier = Modifier.semantics { heading() }
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(Lavanda),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Iconos.Familia, contentDescription = null, tint = TextoChip, modifier = Modifier.size(32.dp))
-                }
-                Text("Todavía no tienes pacientes", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
-                Text(
-                    "Pídele a tu paciente el código que aparece en su app, en Mi familia → Agregar a alguien.",
-                    fontSize = 17.sp,
-                    lineHeight = 24.sp,
-                    color = TextoSecundario
-                )
-            }
-            BotonPrincipal("Vincular paciente", onClick = onVincular)
-        }
     }
 }
 
@@ -261,21 +242,6 @@ private fun Dato(etiqueta: String, valor: String?, ultimo: Boolean = false) {
         Text(if (valor.isNullOrBlank()) "—" else valor, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextoNormal)
     }
     if (!ultimo) Box(Modifier.fillMaxWidth().height(1.5.dp).background(LavandaSuave))
-}
-
-private fun saludo(): String = when (LocalTime.now().hour) {
-    in 5..11 -> "Buenos días,"
-    in 12..18 -> "Buenas tardes,"
-    else -> "Buenas noches,"
-}
-
-@Preview(name = "M4 · Mis pacientes (vacío)", widthDp = 360, heightDp = 800, showBackground = true)
-@Composable
-private fun PreviewPacientes() = BuenVivirTheme {
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f)) { PacientesScreen("Laura Méndez") {} }
-        MenuMedico(0, {}, {})
-    }
 }
 
 @Preview(name = "Mi perfil (médico)", widthDp = 360, heightDp = 800, showBackground = true)

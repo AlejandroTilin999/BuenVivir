@@ -67,10 +67,10 @@ fun calcularPanorama(
 
     val siguiente = if (indice + 1 < horarios.size) {
         val s = horarios[indice + 1]
-        ProximaToma(s.medicina.nombre, "Hoy a las ${horaTexto(s.horario.minutos)}")
+        ProximaToma(s.medicina.nombre, "Hoy · ${horaTexto(s.horario.minutos)}")
     } else {
         val s = horarios.first()
-        ProximaToma(s.medicina.nombre, "Mañana a las ${horaTexto(s.horario.minutos)}")
+        ProximaToma(s.medicina.nombre, "Mañana · ${horaTexto(s.horario.minutos)}")
     }
 
     // Semana de lunes a domingo

@@ -91,7 +91,7 @@ fun AjustesScreen(
                         letterSpacing = (-0.5).sp,
                         modifier = Modifier.semantics { heading() }
                     )
-                    BotonEscuchar("Escuchar esta pantalla", Lavanda, onEscuchar)
+                    BotonEscuchar("Escuchar esta pantalla", LavandaChip, onEscuchar)
                 }
             }
 

@@ -78,7 +78,7 @@ object Repositorio {
         indicacion = "después del desayuno"
     )
 
-    val siguiente = ProximaToma(medicina = "Metformina", cuando = "Mañana a las 8:00 a. m.")
+    val siguiente = ProximaToma(medicina = "Metformina", cuando = "Mañana · 8:00 a. m.")
 
     /** Semana de ejemplo: lunes 12 a domingo 18 (hoy). */
     val semana = listOf(

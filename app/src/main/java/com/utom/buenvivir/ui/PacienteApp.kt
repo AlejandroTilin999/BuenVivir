@@ -46,6 +46,7 @@ import com.utom.buenvivir.data.RepositorioLocal
 import java.time.LocalDateTime
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import com.utom.buenvivir.data.MiembroEquipo
 import com.utom.buenvivir.data.Nube
 import com.utom.buenvivir.ui.screens.CodigoScreen
 import com.utom.buenvivir.ui.screens.EstadoCodigo
@@ -78,13 +79,16 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
     var textoAviso by remember { mutableStateOf("Tu respuesta se guardó") }
     var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Inicio, 1 Mis medicinas, 2 Mi familia, 3 Detalle, 4 Ajustes, 5 Mi código
 
+    // Su médico y su familia, en vivo desde Firebase
+    val equipo by remember { Nube.escucharEquipo() }.collectAsState(initial = emptyList())
+
     // "Mi código": se pide a Firebase al abrir la pantalla (la primera vez se crea)
     var estadoCodigo by remember { mutableStateOf<EstadoCodigo>(EstadoCodigo.Cargando) }
     var intentosCodigo by remember { mutableIntStateOf(0) }
     LaunchedEffect(pestana, intentosCodigo) {
         if (pestana == 5 && estadoCodigo !is EstadoCodigo.Listo) {
             estadoCodigo = EstadoCodigo.Cargando
-            Nube.miCodigo { codigo ->
+            Nube.miCodigo(Repositorio.nombrePaciente) { codigo ->
                 estadoCodigo = if (codigo != null) EstadoCodigo.Listo(codigo) else EstadoCodigo.Error
             }
         }
@@ -197,10 +201,13 @@ fun PacienteApp(abrirMotivo: Boolean = false, onMotivoAbierto: () -> Unit = {}) 
                 onIrFamilia = { pestana = 2 }
             )
             2 -> FamiliaScreen(
-                familiares = Repositorio.familiares,
-                medico = Repositorio.medico,
-                onEscuchar = { lector.leer(textoFamilia()) },
+                equipo = equipo,
+                onEscuchar = { lector.leer(textoFamilia(equipo)) },
                 onAgregar = { pestana = 5 },
+                onQuitar = { m ->
+                    Nube.quitarDelEquipo(m.id)
+                    avisar("Se quitó a ${m.nombre}")
+                },
                 onIrInicio = { pestana = 0 },
                 onIrMedicinas = { pestana = 1 }
             )
@@ -334,11 +341,14 @@ private fun textoMedicinas(p: Panorama): String {
     return "Esta semana te tomaste ${p.tomadasSemana} de ${p.totalSemana} pastillas. Hoy: $tomas. Tus medicinas: $medicinas."
 }
 
-private fun textoFamilia(): String {
-    val familia = Repositorio.familiares.joinToString(". ") { "${it.nombre}, ${it.relacion.replaceFirstChar { c -> c.lowercase() }}" }
-    val m = Repositorio.medico
-    return "Mi familia. $familia. Tu médico: ${m.nombre}, ${m.relacion}. " +
-        "Ellos ven si tomaste tus pastillas para poder ayudarte."
+private fun textoFamilia(equipo: List<MiembroEquipo>): String {
+    if (equipo.isEmpty()) {
+        return "Mi familia. Todavía no agregas a nadie. Toca Agregar a alguien y dale tu código a tu médico o a un familiar."
+    }
+    val personas = equipo.joinToString(". ") { m ->
+        (if (m.esMedico) "Tu médico: " else "") + m.nombre + if (m.detalle.isNotBlank()) ", ${m.detalle}" else ""
+    }
+    return "Mi familia. $personas. Ellos ven si tomaste tus pastillas para poder ayudarte."
 }
 
 private fun textoAjustes(a: Ajustes): String {

@@ -136,7 +136,7 @@ private fun ComoTomarla(medicina: Medicina, onEscuchar: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Titulo("Cómo tomarla")
-            BotonEscuchar("Escuchar cómo tomarla", Lavanda, onEscuchar)
+            BotonEscuchar("Escuchar cómo tomarla", LavandaChip, onEscuchar)
         }
         Text(
             buildAnnotatedString {

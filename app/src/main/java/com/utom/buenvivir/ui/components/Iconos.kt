@@ -52,6 +52,7 @@ object Iconos {
     ).apply {
         addPath(pathData = addPathNodes("M8 5v14l11-7z"), fill = SolidColor(Color.Black))
     }.build()
+    val Tache = icono("M6 6l12 12", "M18 6L6 18", grosor = 3f)
     val Persona = icono("M8 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M4 21a8 8 0 0 1 16 0")
     val Ojo = icono("M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z", "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0")
     val OjoTachado = icono(

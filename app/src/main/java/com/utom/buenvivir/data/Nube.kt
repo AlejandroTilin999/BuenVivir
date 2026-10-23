@@ -7,8 +7,17 @@ import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.ListenerRegistration
 import com.utom.buenvivir.data.db.TomaEntity
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import java.util.Date
+
+/** Alguien que acompaña al paciente: su médico o un familiar (lo agregan con su código). */
+data class MiembroEquipo(val id: String, val nombre: String, val rol: String, val detalle: String) {
+    val esMedico get() = rol == SesionStore.MEDICO
+}
 
 /**
  * Manda las tomas del paciente a Firebase (Firestore) para que después las vean su familia y su médico.
@@ -17,6 +26,7 @@ import java.util.Date
  * Cómo queda en la nube:
  *   pacientes/{uid}                      -> nombre, ultimaConexion
  *   pacientes/{uid}/tomas/{horario_fecha} -> medicina, fecha, hora, tomada, motivo, registradaEn
+ *   pacientes/{uid}/equipo/{uidMedico}   -> rol, nombre, detalle, codigo, desde
  */
 object Nube {
     private const val TAG = "Nube"
@@ -50,11 +60,16 @@ object Nube {
      *
      *   codigos/{codigo} -> paciente (su uid)
      */
-    fun miCodigo(listo: (String?) -> Unit) = conUsuario(alFallar = { listo(null) }) { uid ->
+    fun miCodigo(nombre: String, listo: (String?) -> Unit) = conUsuario(alFallar = { listo(null) }) { uid ->
         db.collection("pacientes").document(uid).get()
             .addOnSuccessListener { doc ->
                 val guardado = doc.getString("codigo")
-                if (guardado != null) listo(guardado) else crearCodigo(uid, intentos = 5, listo)
+                if (guardado != null) {
+                    // El código guarda el nombre, para que el médico vea "Se encontró a Don José"
+                    db.collection("codigos").document(guardado)
+                        .set(mapOf("paciente" to uid, "nombre" to nombre), SetOptions.merge())
+                    listo(guardado)
+                } else crearCodigo(uid, nombre, intentos = 5, listo)
             }
             .addOnFailureListener {
                 Log.w(TAG, "No se pudo leer el código", it)
@@ -62,7 +77,7 @@ object Nube {
             }
     }
 
-    private fun crearCodigo(uid: String, intentos: Int, listo: (String?) -> Unit) {
+    private fun crearCodigo(uid: String, nombre: String, intentos: Int, listo: (String?) -> Unit) {
         if (intentos == 0) { listo(null); return }
         val codigo = (1..6).map { LETRAS.random() }.joinToString("")
         val refCodigo = db.collection("codigos").document(codigo)
@@ -70,15 +85,42 @@ object Nube {
         db.runTransaction { tx ->
             // Si por casualidad ya existe ese código, se intenta con otro
             if (tx.get(refCodigo).exists()) return@runTransaction false
-            tx.set(refCodigo, mapOf("paciente" to uid, "creado" to Timestamp.now()))
+            tx.set(refCodigo, mapOf("paciente" to uid, "nombre" to nombre, "creado" to Timestamp.now()))
             tx.set(refPaciente, mapOf("codigo" to codigo), SetOptions.merge())
             true
         }.addOnSuccessListener { creado ->
-            if (creado) listo(codigo) else crearCodigo(uid, intentos - 1, listo)
+            if (creado) listo(codigo) else crearCodigo(uid, nombre, intentos - 1, listo)
         }.addOnFailureListener {
             Log.w(TAG, "No se pudo crear el código", it)
             listo(null)
         }
+    }
+
+    /** Su médico y sus familiares, en vivo: si alguien se vincula o se quita, se actualiza solo. */
+    fun escucharEquipo(): Flow<List<MiembroEquipo>> = callbackFlow {
+        var registro: ListenerRegistration? = null
+        conUsuario(alFallar = { trySend(emptyList()) }) { uid ->
+            registro = db.collection("pacientes").document(uid).collection("equipo")
+                .addSnapshotListener { snap, error ->
+                    if (error != null) Log.w(TAG, "No se pudo leer el equipo", error)
+                    snap ?: return@addSnapshotListener
+                    trySend(snap.documents.map {
+                        MiembroEquipo(
+                            id = it.id,
+                            nombre = it.getString("nombre") ?: "",
+                            rol = it.getString("rol") ?: "",
+                            detalle = it.getString("detalle") ?: ""
+                        )
+                    })
+                }
+        }
+        awaitClose { registro?.remove() }
+    }
+
+    /** El paciente quita a alguien: ya no podrá ver sus tomas. */
+    fun quitarDelEquipo(id: String) = conUsuario { uid ->
+        db.collection("pacientes").document(uid).collection("equipo").document(id).delete()
+            .addOnFailureListener { Log.w(TAG, "No se pudo quitar", it) }
     }
 
     private fun tomasDe(uid: String) =

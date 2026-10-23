@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -51,6 +52,8 @@ fun Campo(
     teclado: KeyboardType = KeyboardType.Text,
     esContrasena: Boolean = false,
     ultimo: Boolean = false,
+    mayusculas: Boolean = false,
+    grande: Boolean = false,
     onListo: () -> Unit = {}
 ) {
     var verContrasena by remember { mutableStateOf(false) }
@@ -60,7 +63,11 @@ fun Campo(
             value = valor,
             onValueChange = onCambio,
             singleLine = true,
-            textStyle = TextStyle(fontSize = 18.sp, color = TextoNormal),
+            textStyle = if (grande) {
+                TextStyle(fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 8.sp, color = TextoOscuro)
+            } else {
+                TextStyle(fontSize = 18.sp, color = TextoNormal)
+            },
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AzulBoton,
@@ -71,6 +78,8 @@ fun Campo(
             ),
             visualTransformation = if (esContrasena && !verContrasena) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(
+                capitalization = if (mayusculas) KeyboardCapitalization.Characters else KeyboardCapitalization.None,
+                autoCorrectEnabled = false,
                 keyboardType = teclado,
                 imeAction = if (ultimo) ImeAction.Done else ImeAction.Next
             ),

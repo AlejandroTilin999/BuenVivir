@@ -178,10 +178,15 @@ private fun TarjetaToma(
     // La tarjeta se tiñe según lo que pasó: morado si la tomó, gris si no.
     val (fondo, borde) = when (estado) {
         EstadoToma.Pendiente -> Blanco to BordeTarjeta
-        EstadoToma.Tomada -> FondoTomada to BordeTomada
+        EstadoToma.Tomada -> Blanco to BordeTarjeta
         is EstadoToma.Omitida -> FondoOmitida to BordeOmitida
     }
-    val fondoChip = Lavanda
+    // El chip de la hora se apaga cuando la pastilla ya pasó, para que no parezca pendiente.
+    val (fondoChip, colorChip, iconoChip) = when (estado) {
+        EstadoToma.Pendiente -> Triple(LavandaChip, TextoChip, Iconos.Reloj)
+        EstadoToma.Tomada -> Triple(ChipApagado, TextoApagado, Iconos.Palomita)
+        is EstadoToma.Omitida -> Triple(ChipApagado, TextoApagado, Iconos.Menos)
+    }
     val etiquetaHora = if (estado == EstadoToma.Pendiente) "Ahora · ${toma.hora}" else "Hoy · ${toma.hora}"
     val forma = RoundedCornerShape(28.dp)
 
@@ -208,10 +213,10 @@ private fun TarjetaToma(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Iconos.Reloj, contentDescription = null, tint = TextoChip, modifier = Modifier.size(20.dp))
-                Text(etiquetaHora, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoChip)
+                Icon(iconoChip, contentDescription = null, tint = colorChip, modifier = Modifier.size(20.dp))
+                Text(etiquetaHora, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colorChip)
             }
-            BotonEscuchar("Escuchar las indicaciones de esta pastilla", fondoChip, onEscuchar)
+            BotonEscuchar("Escuchar las indicaciones de esta pastilla", LavandaChip, onEscuchar)
         }
 
         // Nombre y para qué sirve
@@ -266,7 +271,8 @@ private fun TarjetaToma(
 
             EstadoToma.Tomada -> Column {
                 Aviso(
-                    fondo = MoradoAviso,
+                    fondo = AvisoTomada,
+                    borde = BordeAvisoTomada,
                     fondoIcono = Violeta,
                     icono = Iconos.Palomita,
                     colorIcono = Blanco,
@@ -299,6 +305,7 @@ private fun TarjetaToma(
 @Composable
 private fun Aviso(
     fondo: Color,
+    borde: Color? = null,
     fondoIcono: Color,
     icono: ImageVector,
     colorIcono: Color,
@@ -307,12 +314,14 @@ private fun Aviso(
     detalle: String?,
     colorDetalle: Color
 ) {
+    val forma = RoundedCornerShape(20.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .then(if (borde != null) Modifier.border(2.dp, borde, forma) else Modifier)
+            .clip(forma)
             .background(fondo)
-            .padding(14.dp)
+            .padding(if (borde != null) 12.dp else 14.dp)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -339,18 +348,32 @@ private fun Aviso(
 
 @Composable
 private fun TarjetaSiguiente(siguiente: ProximaToma) {
-    Column(
+    val forma = RoundedCornerShape(14.dp)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(AzulClaro)
-            .padding(horizontal = 18.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            // Sombra corta, se nota sobre todo abajo
+            .shadow(elevation = 3.dp, shape = forma, ambientColor = TextoOscuro, spotColor = TextoOscuro)
+            .border(2.dp, BordeTarjeta, forma)
+            .clip(forma)
+            .background(Blanco)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Siguiente · ${siguiente.medicina}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoAzul)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Iconos.Reloj, contentDescription = null, tint = TextoAzulOscuro, modifier = Modifier.size(20.dp))
-            Text(siguiente.cuando, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextoAzulOscuro)
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Lavanda),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Iconos.Pastilla, contentDescription = null, tint = TextoChip, modifier = Modifier.size(24.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(siguiente.medicina, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
+            Text(siguiente.cuando, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoSecundario)
         }
     }
 }

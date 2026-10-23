@@ -88,7 +88,7 @@ fun MotivoSheet(
                 )
                 Text("Tu familia y tu médico lo verán.", fontSize = 16.sp, color = TextoSecundario)
             }
-            BotonEscuchar("Escuchar las opciones", Lavanda, onEscuchar)
+            BotonEscuchar("Escuchar las opciones", LavandaChip, onEscuchar)
         }
 
         Column(

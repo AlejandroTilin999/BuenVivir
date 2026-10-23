@@ -235,7 +235,7 @@ private fun ChipEstado(estado: EstadoToma) {
     val forma = RoundedCornerShape(12.dp)
     val (texto, icono, fondo, color) = when (estado) {
         EstadoToma.Tomada -> Estilo("Tomada", Iconos.Palomita, Violeta, Blanco)
-        EstadoToma.Pendiente -> Estilo("Pendiente", Iconos.Reloj, Lavanda, TextoChip)
+        EstadoToma.Pendiente -> Estilo("Pendiente", Iconos.Reloj, LavandaChip, TextoChip)
         is EstadoToma.Omitida -> Estilo("No la tomó", Iconos.Menos, GrisAviso, Blanco)
     }
     Row(

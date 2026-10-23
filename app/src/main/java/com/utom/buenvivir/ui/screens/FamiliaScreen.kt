@@ -2,54 +2,60 @@ package com.utom.buenvivir.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.utom.buenvivir.data.Contacto
-import com.utom.buenvivir.data.Repositorio
+import com.utom.buenvivir.data.MiembroEquipo
 import com.utom.buenvivir.ui.components.BotonEscuchar
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.components.MenuInferior
 import com.utom.buenvivir.ui.theme.*
 
-/** Pantalla 6: quién acompaña al paciente (familia y médico). */
+/** Pantalla 6: quién acompaña al paciente (su médico y su familia), en vivo desde Firebase. */
 @Composable
 fun FamiliaScreen(
-    familiares: List<Contacto>,
-    medico: Contacto?,
+    equipo: List<MiembroEquipo>,
     onEscuchar: () -> Unit = {},
     onAgregar: () -> Unit = {},
+    onQuitar: (MiembroEquipo) -> Unit = {},
     onIrInicio: () -> Unit = {},
     onIrMedicinas: () -> Unit = {}
 ) {
-    val total = familiares.size + if (medico != null) 1 else 0
+    var porQuitar by remember { mutableStateOf<MiembroEquipo?>(null) }
+    val medicos = equipo.filter { it.esMedico }
+    val familia = equipo.filterNot { it.esMedico }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Blanco)
     ) {
-        Encabezado(total, onEscuchar)
+        Encabezado(equipo.size, onEscuchar)
 
         Column(
             modifier = Modifier
@@ -58,13 +64,27 @@ fun FamiliaScreen(
                 .padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            if (familiares.isNotEmpty()) {
-                Seccion("Familia") {
-                    familiares.forEach { TarjetaFamiliar(it) }
+            if (equipo.isEmpty()) {
+                Text(
+                    "Todavía no agregas a nadie. Toca el botón de abajo y dale tu código a tu médico o a un familiar.",
+                    fontSize = 18.sp,
+                    lineHeight = 26.sp,
+                    color = TextoGris,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
+                        .padding(18.dp)
+                )
+            }
+            if (medicos.isNotEmpty()) {
+                Seccion(if (medicos.size == 1) "Tu médico" else "Tus médicos") {
+                    medicos.forEach { TarjetaMedico(it) { porQuitar = it } }
                 }
             }
-            if (medico != null) {
-                Seccion("Tu médico") { TarjetaMedico(medico) }
+            if (familia.isNotEmpty()) {
+                Seccion("Familia") {
+                    familia.forEach { TarjetaFamiliar(it) { porQuitar = it } }
+                }
             }
 
             // Abre "Mi código" para que se vinculen su médico o un familiar
@@ -86,6 +106,27 @@ fun FamiliaScreen(
         }
 
         MenuInferior(seleccionado = 2, onInicio = onIrInicio, onMedicinas = onIrMedicinas, onFamilia = {})
+    }
+
+    porQuitar?.let { m ->
+        AlertDialog(
+            onDismissRequest = { porQuitar = null },
+            title = { Text("¿Quitar a ${m.nombre}?", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Text("Ya no podrá ver si tomaste tus pastillas.", fontSize = 19.sp, lineHeight = 26.sp)
+            },
+            confirmButton = {
+                TextButton(onClick = { porQuitar = null; onQuitar(m) }) {
+                    Text("Sí, quitar", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { porQuitar = null }) {
+                    Text("Cancelar", fontSize = 19.sp, color = TextoGris)
+                }
+            },
+            containerColor = Blanco
+        )
     }
 }
 
@@ -163,13 +204,12 @@ private fun Seccion(titulo: String, contenido: @Composable ColumnScope.() -> Uni
 }
 
 @Composable
-private fun TarjetaFamiliar(contacto: Contacto) {
+private fun TarjetaFamiliar(m: MiembroEquipo, onQuitar: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
-            .semantics(mergeDescendants = true) {}
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(start = 16.dp, end = 6.dp, top = 14.dp, bottom = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -180,24 +220,24 @@ private fun TarjetaFamiliar(contacto: Contacto) {
                 .background(Lavanda),
             contentAlignment = Alignment.Center
         ) {
-            Text(contacto.nombre.take(1).uppercase(), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = TextoChip)
+            Text(m.nombre.take(1).uppercase(), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = TextoChip)
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(contacto.nombre, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
-            Text(contacto.relacion, fontSize = 16.sp, color = TextoSecundario)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(m.nombre, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
+            if (m.detalle.isNotBlank()) Text(m.detalle, fontSize = 16.sp, color = TextoSecundario)
         }
+        Quitar(m.nombre, TextoChip, onQuitar)
     }
 }
 
 @Composable
-private fun TarjetaMedico(contacto: Contacto) {
+private fun TarjetaMedico(m: MiembroEquipo, onQuitar: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
             .background(AzulClaro)
-            .semantics(mergeDescendants = true) {}
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(start = 16.dp, end = 6.dp, top = 14.dp, bottom = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -210,15 +250,41 @@ private fun TarjetaMedico(contacto: Contacto) {
         ) {
             Icon(Iconos.Estetoscopio, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(28.dp))
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(contacto.nombre, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextoAzulOscuro)
-            Text(contacto.relacion, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoAzul)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(m.nombre, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextoAzulOscuro)
+            if (m.detalle.isNotBlank()) Text(m.detalle, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoAzul)
         }
+        Quitar(m.nombre, TextoAzulOscuro, onQuitar)
     }
+}
+
+/** Enlace "Quitar" con área grande para tocar. */
+@Composable
+private fun Quitar(nombre: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Text(
+        "Quitar",
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Bold,
+        color = color,
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClickLabel = "Quitar a $nombre", onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 14.dp)
+    )
 }
 
 @Preview(name = "Mi familia", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewFamilia() = BuenVivirTheme {
-    FamiliaScreen(Repositorio.familiares, Repositorio.medico)
+    FamiliaScreen(
+        listOf(
+            MiembroEquipo("1", "Laura Méndez", "medico", "Centro de Salud"),
+            MiembroEquipo("2", "María", "familiar", "")
+        )
+    )
 }
+
+@Preview(name = "Mi familia · vacía", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun PreviewFamiliaVacia() = BuenVivirTheme { FamiliaScreen(emptyList()) }
