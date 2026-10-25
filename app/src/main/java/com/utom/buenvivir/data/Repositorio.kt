@@ -38,6 +38,7 @@ data class Ajustes(
     val volumen: Int = 2,            // 0 Bajo, 1 Medio, 2 Alto
     val avisarEnReloj: Boolean = true,
     val vibrarEnReloj: Boolean = true,
+    val sonarEnReloj: Boolean = false,
     val registrarDesdeReloj: Boolean = false,
     val temaOscuro: Boolean = false,
     val vozLenta: Boolean = true

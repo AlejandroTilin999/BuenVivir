@@ -13,6 +13,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -217,7 +220,7 @@ private fun PantallasMedico(onSalir: () -> Unit) {
     ) {
         Box(modifier = Modifier.weight(1f)) {
             when (pestana) {
-                1 -> PerfilMedicoScreen(perfil, onSalir)
+                1 -> PerfilMedicoScreen(perfil, onSalir, onEliminar = { Cuenta.eliminar(it) })
                 else -> PacientesScreen(
                     nombre = perfil?.nombre ?: "",
                     pacientes = pacientes,
@@ -232,7 +235,17 @@ private fun PantallasMedico(onSalir: () -> Unit) {
 
 /** Mi perfil: sus datos y el botón para cerrar sesión. */
 @Composable
-fun PerfilMedicoScreen(perfil: PerfilMedico?, onSalir: () -> Unit) {
+fun PerfilMedicoScreen(
+    perfil: PerfilMedico?,
+    onSalir: () -> Unit,
+    onEliminar: suspend (contrasena: String) -> Resultado = { Resultado.Bien }
+) {
+    val alcance = rememberCoroutineScope()
+    var eliminando by remember { mutableStateOf(false) }   // el cuadro de confirmar está abierto
+    var contrasena by remember { mutableStateOf("") }
+    var ocupado by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -278,6 +291,62 @@ fun PerfilMedicoScreen(perfil: PerfilMedico?, onSalir: () -> Unit) {
         ) {
             Text("Cerrar sesión", fontSize = 19.sp, fontWeight = FontWeight.Bold)
         }
+        TextButton(
+            onClick = { eliminando = true; contrasena = ""; error = null },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+        ) {
+            Text("Eliminar mi cuenta", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TextoGris)
+        }
+    }
+
+    if (eliminando) {
+        AlertDialog(
+            onDismissRequest = { if (!ocupado) eliminando = false },
+            title = { Text("¿Eliminar tu cuenta?", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Se borra para siempre. Dejarás de ver a todas las personas que tienes vinculadas y ya no podrás entrar con este correo.",
+                        fontSize = 17.sp,
+                        lineHeight = 24.sp
+                    )
+                    Campo(
+                        etiqueta = "Escribe tu contraseña para confirmar",
+                        valor = contrasena,
+                        onCambio = { contrasena = it; error = null },
+                        teclado = KeyboardType.Password,
+                        esContrasena = true,
+                        ultimo = true
+                    )
+                    error?.let { Aviso(AvisoMedico(it, esError = true)) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !ocupado,
+                    onClick = {
+                        alcance.launch {
+                            ocupado = true
+                            when (val r = onEliminar(contrasena)) {
+                                Resultado.Bien -> { eliminando = false; onSalir() }
+                                is Resultado.Mal -> error = r.mensaje
+                            }
+                            ocupado = false
+                        }
+                    }
+                ) {
+                    Text(if (ocupado) "Eliminando…" else "Sí, eliminar", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = GrisAviso)
+                }
+            },
+            dismissButton = {
+                TextButton(enabled = !ocupado, onClick = { eliminando = false }) {
+                    Text("Cancelar", fontSize = 17.sp, color = AzulBoton)
+                }
+            },
+            containerColor = Blanco
+        )
     }
 }
 
@@ -299,5 +368,5 @@ private fun Dato(etiqueta: String, valor: String?, ultimo: Boolean = false) {
 @Preview(name = "Mi perfil (médico)", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewPerfil() = BuenVivirTheme {
-    PerfilMedicoScreen(PerfilMedico("Laura Méndez", "", "Centro de Salud", "laura@correo.com", false)) {}
+    PerfilMedicoScreen(PerfilMedico("Laura Méndez", "", "Centro de Salud", "laura@correo.com", false), onSalir = {})
 }

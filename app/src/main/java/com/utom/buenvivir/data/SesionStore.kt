@@ -26,6 +26,11 @@ class SesionStore(private val context: Context) {
     /** El rol guardado, o null si todavía no se elige. */
     val rol: Flow<String?> = context.sesionStore.data.map { it[clave] }
 
+    /** Este celular deja de ser del paciente: se olvidan su rol y su nombre. */
+    suspend fun olvidar() {
+        context.sesionStore.edit { it.remove(clave); it.remove(claveNombre) }
+    }
+
     suspend fun guardarRol(rol: String?) {
         context.sesionStore.edit { if (rol == null) it.remove(clave) else it[clave] = rol }
     }

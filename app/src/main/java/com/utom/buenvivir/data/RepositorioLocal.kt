@@ -6,14 +6,17 @@ import com.utom.buenvivir.data.db.BuenVivirDb
 import com.utom.buenvivir.data.db.HorarioEntity
 import com.utom.buenvivir.data.db.MedicinaEntity
 import com.utom.buenvivir.data.db.TomaEntity
+import com.utom.buenvivir.reloj.Reloj
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.ZoneId
 
 /**
  * Lee y guarda en la base de datos del celular (Room).
  * Cada toma también se manda a Firebase (ver [Nube]) para la familia y el médico.
  */
-class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
+class RepositorioLocal private constructor(private val dao: BuenVivirDao, private val contexto: Context) {
 
     val medicinas = dao.medicinas()
 
@@ -22,18 +25,27 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
     fun ultimasTomas(medicinaId: Long, limite: Int = 5) = dao.ultimasTomas(medicinaId, limite)
 
     /** Registra si se tomó o no una pastilla. Si ya estaba registrada, la corrige. */
-    suspend fun registrar(horario: HorarioEntity, fecha: LocalDate, tomada: Boolean, motivo: String?) {
+    suspend fun registrar(
+        horario: HorarioEntity,
+        fecha: LocalDate,
+        tomada: Boolean,
+        motivo: String?,
+        registradaEn: Long = System.currentTimeMillis()   // el reloj manda la hora real en que contestó
+    ) {
         val toma = TomaEntity(
             medicinaId = horario.medicinaId,
             horarioId = horario.id,
             fecha = fecha.toString(),
             minutos = horario.minutos,
             tomada = tomada,
-            motivo = if (tomada) null else motivo
+            motivo = if (tomada) null else motivo,
+            registradaEn = registradaEn
         )
         dao.guardarToma(toma)
         // También a la nube, para la familia y el médico
         Nube.subirToma(toma, dao.medicina(horario.medicinaId)?.nombre ?: "")
+        // Y al reloj, para que quite el aviso si lo tenía en pantalla
+        Reloj.listo(contexto, horario.id, fecha)
     }
 
     /**
@@ -103,6 +115,11 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
         val ids = nube.map { it.id }.toSet()
         locales.filter { it.nubeId.isNotEmpty() && it.nubeId !in ids }.forEach { dao.borrarMedicina(it.id); cambio = true }
         return cambio
+    }
+
+    /** Borra todo lo del celular: medicinas, horarios y tomas (cuando deja de ser paciente). */
+    suspend fun borrarTodo() = withContext(Dispatchers.IO) {
+        BuenVivirDb.get(contexto).clearAllTables()
     }
 
     /** true si este celular ya se usó como paciente (tiene medicinas guardadas). */
@@ -200,7 +217,7 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao) {
         @Volatile private var instancia: RepositorioLocal? = null
 
         fun get(context: Context): RepositorioLocal = instancia ?: synchronized(this) {
-            instancia ?: RepositorioLocal(BuenVivirDb.get(context).dao()).also { instancia = it }
+            instancia ?: RepositorioLocal(BuenVivirDb.get(context).dao(), context.applicationContext).also { instancia = it }
         }
     }
 }

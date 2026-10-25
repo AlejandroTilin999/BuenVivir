@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "BuenVivir"
 include(":app")
+include(":wear")   // la app del reloj (Wear OS)
  

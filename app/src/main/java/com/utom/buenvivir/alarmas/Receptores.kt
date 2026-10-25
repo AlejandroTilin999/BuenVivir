@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.utom.buenvivir.data.AjustesStore
 import com.utom.buenvivir.data.RepositorioLocal
+import com.utom.buenvivir.reloj.Reloj
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -53,6 +54,9 @@ class AlarmaReceiver : BroadcastReceiver() {
 
         val m = repo.medicina(h.medicinaId) ?: return@enSegundoPlano
         Notificaciones.mostrar(ctx, h, m, fecha, ajustes)
+        // También al reloj, solo en el primer aviso (las repeticiones ya las tiene en pantalla)
+        android.util.Log.i("Reloj", "Alarma: avisarEnReloj=${ajustes.avisarEnReloj}, intento=$intento")
+        if (ajustes.avisarEnReloj && intento == 0) Reloj.avisar(ctx, h, m, fecha, ajustes.vibrarEnReloj, ajustes.sonarEnReloj, prueba)
 
         // Siguiente aviso (el último solo revisa si respondió)
         Programador.programarRepeticion(ctx, horarioId, fecha, intento + 1, ajustes.repetirMinutos)

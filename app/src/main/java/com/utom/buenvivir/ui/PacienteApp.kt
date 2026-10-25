@@ -41,6 +41,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.utom.buenvivir.alarmas.Notificaciones
 import com.utom.buenvivir.alarmas.Programador
+import com.utom.buenvivir.alarmas.PruebaRapida
+import com.utom.buenvivir.reloj.Reloj
+import com.google.android.gms.wearable.Wearable
 import com.utom.buenvivir.data.AjustesStore
 import com.utom.buenvivir.data.RepositorioLocal
 import java.time.LocalDateTime
@@ -64,6 +67,8 @@ import com.utom.buenvivir.ui.screens.MiMedicoScreen
 import com.utom.buenvivir.ui.screens.PrivacidadScreen
 import com.utom.buenvivir.ui.screens.AyudaScreen
 import com.utom.buenvivir.ui.screens.AcercaDeScreen
+import com.utom.buenvivir.ui.screens.CambiarRolScreen
+import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.ui.screens.TEXTO_PRIVACIDAD
 import com.utom.buenvivir.ui.screens.TEXTO_AYUDA
 import com.utom.buenvivir.ui.screens.TEXTO_ACERCA
@@ -80,6 +85,7 @@ private const val DURACION_AVISO_MS = 5_000L
 fun PacienteApp(
     nombre: String,
     onCambiarNombre: (String) -> Unit = {},
+    onDejarDeSerPaciente: () -> Unit = {},
     abrirMotivo: Boolean = false,
     onMotivoAbierto: () -> Unit = {}
 ) {
@@ -163,6 +169,24 @@ fun PacienteApp(
         if (medicinaId == null) flowOf(emptyList()) else repo.ultimasTomas(medicinaId)
     }.collectAsState(initial = emptyList())
     val ajustes by store.ajustes.collectAsState(initial = Repositorio.ajustesIniciales)
+
+    // ¿Hay reloj conectado de verdad? Se revisa cada 5 segundos mientras está abierto Ajustes
+    var relojConectado by remember { mutableStateOf<String?>(null) } // su nombre, o null si no hay
+    LaunchedEffect(pestana) {
+        while (pestana == 4) {
+            Wearable.getNodeClient(context).connectedNodes
+                .addOnSuccessListener { nodos -> relojConectado = nodos.firstOrNull()?.displayName }
+                .addOnFailureListener { relojConectado = null }
+            delay(5_000)
+        }
+    }
+
+    // El reloj muestra cuál es la siguiente pastilla: se actualiza al cambiar las medicinas o al registrar una toma
+    LaunchedEffect(medsCargadas, tomas.size, ahora.hour) { Reloj.enviarSiguiente(context) }
+    // El reloj guarda todos los horarios y programa sus propias alarmas (suena aunque se aleje del celular)
+    LaunchedEffect(medsCargadas, ajustes.avisarEnReloj, ajustes.vibrarEnReloj, ajustes.sonarEnReloj) {
+        Reloj.enviarHorarios(context, ajustes.avisarEnReloj, ajustes.vibrarEnReloj, ajustes.sonarEnReloj)
+    }
     LaunchedEffect(ajustes.vozLenta) { lector.usarVozLenta(ajustes.vozLenta) }
 
     val p = calcularPanorama(meds, tomas, ahora)
@@ -184,7 +208,7 @@ fun PacienteApp(
         pestana = when (pestana) {
             3 -> 1 // del detalle, a Mis medicinas
             5 -> 2 // de Mi código, a Mi familia
-            in 6..11 -> 4 // de Mi nombre, Tono, Mi médico, Privacidad, Ayuda o Acerca de, a Ajustes
+            in 6..12 -> 4 // de Mi nombre, Tono, Mi médico, Privacidad, Ayuda, Acerca de o Quién usa, a Ajustes
             else -> 0
         }
     }
@@ -205,6 +229,39 @@ fun PacienteApp(
             editando = true,
             onRegresar = { pestana = 4 },
             onListo = { onCambiarNombre(it); pestana = 4 }
+        )
+        return
+    }
+
+    // Quién usa este celular: borrar los datos del paciente y regresar a elegir rol
+    if (pestana == 12) {
+        var borrando by remember { mutableStateOf(false) }
+        var errorBorrar by remember { mutableStateOf<String?>(null) }
+        CambiarRolScreen(
+            nombre = nombre,
+            ocupado = borrando,
+            error = errorBorrar,
+            onConfirmar = {
+                if (!borrando) scope.launch {
+                    borrando = true
+                    errorBorrar = null
+                    when (val r = Nube.borrarPaciente()) {
+                        Resultado.Bien -> {
+                            repo.borrarTodo()
+                            onDejarDeSerPaciente()
+                        }
+                        is Resultado.Mal -> errorBorrar = r.mensaje
+                    }
+                    borrando = false
+                }
+            },
+            onRegresar = { pestana = 4 },
+            onEscuchar = {
+                lector.leer(
+                    "Este celular es de $nombre. Para usarlo como médico, como cuidador o para otro paciente, " +
+                        "hay que borrar sus datos. Se borran sus medicinas, sus alarmas y su historial. No se puede deshacer."
+                )
+            }
         )
         return
     }
@@ -269,8 +326,8 @@ fun PacienteApp(
                 4 -> AjustesScreen(
                     ajustes = ajustes,
                     nombre = nombre,
-                    relojNombre = Repositorio.relojNombre,
-                    relojConectado = Repositorio.relojConectado,
+                    relojNombre = relojConectado ?: "Reloj inteligente",
+                    relojConectado = relojConectado != null,
                     onCambiar = { nuevos -> scope.launch { store.guardar(nuevos) } },
                     onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel, ajustes.tono) },
                     onRegresar = { pestana = 0 },
@@ -361,16 +418,16 @@ fun PacienteApp(
             4 -> AjustesScreen(
                 ajustes = ajustes,
                 nombre = nombre,
-                relojNombre = Repositorio.relojNombre,
-                relojConectado = Repositorio.relojConectado,
+                relojNombre = relojConectado ?: "Reloj inteligente",
+                relojConectado = relojConectado != null,
                 onCambiar = { nuevos -> scope.launch { store.guardar(nuevos) } },
                 onProbarVolumen = { nivel -> Notificaciones.probarVolumen(context, nivel, ajustes.tono) },
                 onRegresar = { pestana = 0 },
                 onEscuchar = { lector.leer(textoAjustes(ajustes)) },
                     onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
                 onProbarRecordatorio = {
-                    Programador.programarPrueba(context, p.horario.id, p.hoy)
-                    avisar("Sonará en 1 minuto")
+                    PruebaRapida.programar(context, p.horario.id, p.hoy)
+                    avisar("Sonará en ${PruebaRapida.SEGUNDOS} segundos")
                 },
                 mostrarDemo = RepositorioLocal.MOSTRAR_REINICIAR,
                 onReiniciarDemo = {
@@ -449,6 +506,7 @@ private fun pestanaDeOpcion(opcion: String): Int? = when (opcion) {
     "Privacidad" -> 9
     "Ayuda" -> 10
     "Acerca de BuenVivir" -> 11
+    "Quién usa este celular" -> 12
     else -> null
 }
 

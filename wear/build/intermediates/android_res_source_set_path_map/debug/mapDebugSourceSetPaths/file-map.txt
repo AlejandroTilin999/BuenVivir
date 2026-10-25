@@ -1,0 +1,8 @@
+com.utom.buenvivir.reloj.wear-pngs-0 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\build\generated\res\pngs\debug
+com.utom.buenvivir.reloj.wear-updated_navigation_xml-1 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\build\generated\updated_navigation_xml\debug
+com.utom.buenvivir.reloj.wear-packageDebugResources-2 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.utom.buenvivir.reloj.wear-packageDebugResources-3 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.utom.buenvivir.reloj.wear-debug-4 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\build\intermediates\merged_res\debug\mergeDebugResources
+com.utom.buenvivir.reloj.wear-debug-5 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\src\debug\res
+com.utom.buenvivir.reloj.wear-main-6 C:\Users\Alejandro\AndroidStudioProjects\BuenVivir\wear\src\main\res
+gradleHome-0 C:\Users\Alejandro\.gradle

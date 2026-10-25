@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo de BuenVivir: botiquín azul con una pastilla (igual que en la app del celular) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    <path
+        android:pathData="M44,30v-7a6,6 0,0 1,6 -6h20a6,6 0,0 1,6 6v7"
+        android:strokeWidth="6"
+        android:strokeColor="#004EE0"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#3D7BFF"
+        android:pathData="M28,28h64a18,18 0,0 1,18 18v42a18,18 0,0 1,-18 18H28a18,18 0,0 1,-18 -18V46a18,18 0,0 1,18 -18z" />
+    <group
+        android:pivotX="60"
+        android:pivotY="67"
+        android:rotation="-35">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M43,56h16v22H43a11,11 0,0 1,0 -22z"
+            android:strokeWidth="0.9"
+            android:strokeColor="#3470F2"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#C4B5FD"
+            android:pathData="M61,56h16a11,11 0,0 1,0 22H61z"
+            android:strokeWidth="0.9"
+            android:strokeColor="#3470F2"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

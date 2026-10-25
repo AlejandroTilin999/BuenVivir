@@ -4,6 +4,7 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.FirebaseFirestore
@@ -135,6 +136,36 @@ object Cuenta {
     }
 
     fun salir() = auth.signOut()
+
+    /**
+     * Borra la cuenta para siempre: deja de ver a todos sus pacientes, se borran sus datos
+     * y ya no puede entrar. Pide la contraseña otra vez para confirmar que es él.
+     */
+    suspend fun eliminar(contrasena: String): Resultado {
+        val usuario = auth.currentUser ?: return Resultado.Mal("No hay ninguna sesión abierta.")
+        val correo = usuario.email ?: return Resultado.Mal("Esta cuenta no tiene correo.")
+        if (contrasena.isBlank()) return Resultado.Mal("Escribe tu contraseña para confirmar.")
+        return try {
+            usuario.reauthenticate(EmailAuthProvider.getCredential(correo, contrasena)).esperar()
+            val uid = usuario.uid
+            val lista = db.collection("usuarios").document(uid).collection("pacientes").get().esperar()
+            for (doc in lista.documents) {
+                val paciente = db.collection("pacientes").document(doc.id)
+                // Si era su médico, se quita la marca para que su cuidador pueda agregar medicinas
+                runCatching {
+                    val marca = paciente.collection("marcas").document("medico")
+                    if (marca.get().esperar().getString("uid") == uid) marca.delete().esperar()
+                }
+                runCatching { paciente.collection("equipo").document(uid).delete().esperar() }
+                doc.reference.delete().esperar()
+            }
+            db.collection("usuarios").document(uid).delete().esperar()
+            usuario.delete().esperar()
+            Resultado.Bien
+        } catch (e: Exception) {
+            Resultado.Mal(mensajeDe(e))
+        }
+    }
 
     /** Convierte el error de Firebase en un mensaje que se entienda. */
     internal fun mensajeDe(e: Exception): String = when (e) {

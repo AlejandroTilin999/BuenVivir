@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "C:\\Users\\Alejandro\\.gradle\\daemon\\9.4.1\\com.utom.buenvivir.reloj.wear-debug-40:\\drawable_ic_pastilla.xml.flat",
+        "source": "C:\\Users\\Alejandro\\.gradle\\daemon\\9.4.1\\com.utom.buenvivir.reloj.wear-main-42:\\drawable\\ic_pastilla.xml"
+    },
+    {
+        "merged": "C:\\Users\\Alejandro\\.gradle\\daemon\\9.4.1\\com.utom.buenvivir.reloj.wear-debug-40:\\drawable_ic_buenvivir.xml.flat",
+        "source": "C:\\Users\\Alejandro\\.gradle\\daemon\\9.4.1\\com.utom.buenvivir.reloj.wear-main-42:\\drawable\\ic_buenvivir.xml"
+    },
+    {
+        "merged": "com.utom.buenvivir.reloj.wear-debug-40:/drawable_ic_bocina.xml.flat",
+        "source": "com.utom.buenvivir.reloj.wear-main-42:/drawable/ic_bocina.xml"
+    }
+]

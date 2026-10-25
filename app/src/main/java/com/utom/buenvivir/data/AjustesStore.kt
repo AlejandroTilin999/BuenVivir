@@ -22,6 +22,7 @@ class AjustesStore(private val context: Context) {
         val volumen = intPreferencesKey("volumen")
         val avisarReloj = booleanPreferencesKey("avisar_reloj")
         val vibrarReloj = booleanPreferencesKey("vibrar_reloj")
+        val sonarReloj = booleanPreferencesKey("sonar_reloj")
         val registrarReloj = booleanPreferencesKey("registrar_reloj")
         val oscuro = booleanPreferencesKey("tema_oscuro")
         val vozLenta = booleanPreferencesKey("voz_lenta")
@@ -37,6 +38,7 @@ class AjustesStore(private val context: Context) {
             volumen = p[K.volumen] ?: d.volumen,
             avisarEnReloj = p[K.avisarReloj] ?: d.avisarEnReloj,
             vibrarEnReloj = p[K.vibrarReloj] ?: d.vibrarEnReloj,
+            sonarEnReloj = p[K.sonarReloj] ?: d.sonarEnReloj,
             registrarDesdeReloj = p[K.registrarReloj] ?: d.registrarDesdeReloj,
             temaOscuro = p[K.oscuro] ?: d.temaOscuro,
             vozLenta = p[K.vozLenta] ?: d.vozLenta
@@ -52,6 +54,7 @@ class AjustesStore(private val context: Context) {
             p[K.volumen] = a.volumen
             p[K.avisarReloj] = a.avisarEnReloj
             p[K.vibrarReloj] = a.vibrarEnReloj
+            p[K.sonarReloj] = a.sonarEnReloj
             p[K.registrarReloj] = a.registrarDesdeReloj
             p[K.oscuro] = a.temaOscuro
             p[K.vozLenta] = a.vozLenta

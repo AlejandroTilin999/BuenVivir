@@ -134,6 +134,30 @@ object Nube {
     fun escucharMisMedicinas(): Flow<List<MedicinaNube>?> =
         flow { emit(miId()) }.flatMapLatest { uid -> if (uid == null) emptyFlow() else Recetas.escuchar(uid) }
 
+    /**
+     * El paciente deja de usar la app en este celular: se borra todo lo suyo de Firebase
+     * (medicinas, tomas, quién lo acompaña, su código) y su cuenta anónima.
+     */
+    suspend fun borrarPaciente(): Resultado {
+        val usuario = auth.currentUser ?: return Resultado.Bien
+        val uid = usuario.uid
+        return try {
+            val paciente = db.collection("pacientes").document(uid)
+            for (sub in listOf("medicinas", "tomas", "equipo", "marcas")) {
+                paciente.collection(sub).get().esperar().documents.forEach { it.reference.delete().esperar() }
+            }
+            paciente.get().esperar().getString("codigo")?.let { codigo ->
+                runCatching { db.collection("codigos").document(codigo).delete().esperar() }
+            }
+            paciente.delete().esperar()
+            usuario.delete().esperar()
+            Resultado.Bien
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo borrar al paciente", e)
+            Resultado.Mal("No se pudo borrar. Revisa que tengas internet e intenta otra vez.")
+        }
+    }
+
     /** El paciente quita a alguien: ya no podrá ver sus tomas. */
     fun quitarDelEquipo(id: String) = conUsuario { uid ->
         val paciente = db.collection("pacientes").document(uid)

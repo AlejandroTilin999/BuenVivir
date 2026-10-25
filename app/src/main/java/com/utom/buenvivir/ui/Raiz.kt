@@ -67,6 +67,7 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
         rol == SesionStore.PACIENTE -> PacienteApp(
             nombre = nombre!!,
             onCambiarNombre = { scope.launch { sesion.guardarNombre(it) } },
+            onDejarDeSerPaciente = { scope.launch { sesion.olvidar() } },
             abrirMotivo = abrirMotivo,
             onMotivoAbierto = onMotivoAbierto
         )

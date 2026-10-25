@@ -263,6 +263,32 @@ fun AcercaDeScreen(onRegresar: () -> Unit, onEscuchar: () -> Unit) {
     }
 }
 
+// ---------- Quién usa este celular ----------
+
+@Composable
+fun CambiarRolScreen(
+    nombre: String,
+    ocupado: Boolean,
+    error: String?,
+    onConfirmar: () -> Unit,
+    onRegresar: () -> Unit,
+    onEscuchar: () -> Unit
+) {
+    PantallaAjuste("Quién usa este celular", onRegresar, onEscuchar) {
+        Nota("Ahora este celular es de $nombre, como paciente.")
+        Bloque(
+            "Si quieres cambiarlo",
+            "Para usar este celular como médico, como cuidador o para otro paciente, primero hay que borrar los datos de $nombre."
+        )
+        Bloque(
+            "Qué se borra",
+            "Sus medicinas, sus alarmas, su historial de tomas y su código, en este celular y en la nube. Su médico y quienes lo cuidan ya no lo verán. No se puede deshacer."
+        )
+        error?.let { com.utom.buenvivir.ui.medico.Aviso(com.utom.buenvivir.ui.medico.AvisoMedico(it, esError = true)) }
+        BotonPrincipal(if (ocupado) "Borrando…" else "Borrar datos y cambiar", ocupado = ocupado, onClick = onConfirmar)
+    }
+}
+
 @Preview(name = "Tono", widthDp = 360, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewTono() = BuenVivirTheme {

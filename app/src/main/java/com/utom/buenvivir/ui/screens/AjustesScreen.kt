@@ -164,6 +164,8 @@ fun AjustesScreen(
                     Divisor()
                     FilaInterruptor("Vibrar en el reloj", ajustes.vibrarEnReloj) { onCambiar(ajustes.copy(vibrarEnReloj = it)) }
                     Divisor()
+                    FilaInterruptor("Sonar en el reloj", ajustes.sonarEnReloj) { onCambiar(ajustes.copy(sonarEnReloj = it)) }
+                    Divisor()
                     FilaInterruptor(
                         "Registrar desde el reloj",
                         ajustes.registrarDesdeReloj,
@@ -189,7 +191,7 @@ fun AjustesScreen(
             // "Probar recordatorio" le sirve a cualquiera; "Reiniciar" solo en el celular de la feria
             if (puedeProbar || mostrarDemo) Seccion(if (mostrarDemo) "Para la demostración" else "Probar") {
                 Tarjeta(arriba = 16, abajo = 16) {
-                    if (puedeProbar) BotonContorno("Probar recordatorio en 1 minuto", Iconos.Campana, onProbarRecordatorio)
+                    if (puedeProbar) BotonContorno("Probar recordatorio en 10 segundos", Iconos.Campana, onProbarRecordatorio)
                     if (puedeProbar && mostrarDemo) Spacer(Modifier.height(10.dp))
                     if (mostrarDemo) BotonContorno("Reiniciar demostración", Iconos.Reloj, onReiniciarDemo)
                 }
