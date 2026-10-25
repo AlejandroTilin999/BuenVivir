@@ -1,4 +1,0 @@
-com.utom.buenvivir.reloj
-drawable ic_bocina
-drawable ic_buenvivir
-drawable ic_pastilla
