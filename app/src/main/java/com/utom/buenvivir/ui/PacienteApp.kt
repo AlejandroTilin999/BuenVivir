@@ -41,14 +41,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.utom.buenvivir.alarmas.Notificaciones
 import com.utom.buenvivir.alarmas.Programador
+import com.utom.buenvivir.alarmas.ModoPrueba
 import com.utom.buenvivir.alarmas.PruebaRapida
 import com.utom.buenvivir.reloj.Reloj
+import com.utom.buenvivir.trabajos.Trabajos
 import com.google.android.gms.wearable.Wearable
 import com.utom.buenvivir.data.AjustesStore
 import com.utom.buenvivir.data.RepositorioLocal
 import java.time.LocalDateTime
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import com.utom.buenvivir.data.MedicinaNube
+import com.utom.buenvivir.data.Recetas
+import com.utom.buenvivir.data.SesionStore
+import com.utom.buenvivir.ui.medico.AvisoMedico
+import com.utom.buenvivir.ui.medico.RecetaScreen
 import com.utom.buenvivir.data.MiembroEquipo
 import com.utom.buenvivir.data.Nube
 import com.utom.buenvivir.ui.screens.CodigoScreen
@@ -61,6 +69,7 @@ import com.utom.buenvivir.ui.screens.InicioScreen
 import com.utom.buenvivir.ui.screens.MedicinasScreen
 import com.utom.buenvivir.ui.screens.MotivoSheet
 import com.utom.buenvivir.ui.screens.SinMedicinasScreen
+import com.utom.buenvivir.ui.screens.textoSinMedicinas
 import com.utom.buenvivir.ui.screens.NombreScreen
 import com.utom.buenvivir.ui.screens.TonoScreen
 import com.utom.buenvivir.ui.screens.MiMedicoScreen
@@ -99,7 +108,7 @@ fun PacienteApp(
     var mostrarAviso by remember { mutableStateOf(false) }
     var avisos by remember { mutableIntStateOf(0) }
     var textoAviso by remember { mutableStateOf("Tu respuesta se guardó") }
-    var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Inicio, 1 Mis medicinas, 2 Mi familia, 3 Detalle, 4 Ajustes, 5 Mi código, 6 Mi nombre
+    var pestana by rememberSaveable { mutableIntStateOf(0) } // 0 Inicio, 1 Mis medicinas, 2 Mi familia, 3 Detalle, 4 Ajustes, 5 Mi código, 6 Mi nombre … 13 Agregar medicina, 14 Cambiar medicina
 
     // Su médico y su familia, en vivo desde Firebase
     val equipo by remember { Nube.escucharEquipo() }.collectAsState(initial = emptyList())
@@ -183,6 +192,9 @@ fun PacienteApp(
 
     // El reloj muestra cuál es la siguiente pastilla: se actualiza al cambiar las medicinas o al registrar una toma
     LaunchedEffect(medsCargadas, tomas.size, ahora.hour) { Reloj.enviarSiguiente(context) }
+    // Cada 15 minutos, aunque la app esté cerrada: trae las medicinas que le pongan y programa sus alarmas
+    LaunchedEffect(Unit) { Trabajos.programarPaciente(context) }
+
     // El reloj guarda todos los horarios y programa sus propias alarmas (suena aunque se aleje del celular)
     LaunchedEffect(medsCargadas, ajustes.avisarEnReloj, ajustes.vibrarEnReloj, ajustes.sonarEnReloj) {
         Reloj.enviarHorarios(context, ajustes.avisarEnReloj, ajustes.vibrarEnReloj, ajustes.sonarEnReloj)
@@ -209,12 +221,44 @@ fun PacienteApp(
             3 -> 1 // del detalle, a Mis medicinas
             5 -> 2 // de Mi código, a Mi familia
             in 6..12 -> 4 // de Mi nombre, Tono, Mi médico, Privacidad, Ayuda, Acerca de o Quién usa, a Ajustes
+            13 -> 1 // de Agregar medicina, a Mis medicinas
+            14 -> 3 // de Cambiar medicina, a su detalle
             else -> 0
         }
     }
 
     // Si se abre o se cierra la hoja de motivo, o se cambia de pantalla, deja de hablar
     LaunchedEffect(mostrarMotivo, pestana) { lector.callar() }
+
+    fun avisar(texto: String) {
+        textoAviso = texto
+        avisos++
+    }
+
+    // Sus medicinas como están en Firebase: para saber cuáles agregó él mismo (esas las puede cambiar o quitar)
+    val misNube by remember { Nube.escucharMisMedicinas() }.collectAsState(initial = null)
+    var cambiando by remember { mutableStateOf<MedicinaNube?>(null) }
+    var guardandoMed by remember { mutableStateOf(false) }
+    var errorMed by remember { mutableStateOf<String?>(null) }
+
+    /** Guarda en Firebase. Sin internet, Firebase la guarda en el celular y la sube después. */
+    fun guardarMedicina(m: MedicinaNube, alTerminar: () -> Unit) {
+        if (guardandoMed) return
+        scope.launch {
+            guardandoMed = true
+            errorMed = null
+            val uid = Nube.miId()
+            if (uid == null) {
+                errorMed = "La primera vez se necesita internet. Conéctate e inténtalo otra vez."
+            } else {
+                when (val r = withTimeoutOrNull(6_000) { Recetas.guardar(uid, m) } ?: Resultado.Bien) {
+                    Resultado.Bien -> alTerminar()
+                    is Resultado.Mal -> errorMed = r.mensaje
+                }
+            }
+            guardandoMed = false
+        }
+    }
 
     // Mientras se carga la base de datos la primera vez (es un instante)
     if (medsCargadas == null) {
@@ -266,6 +310,27 @@ fun PacienteApp(
         return
     }
 
+    // El paciente agrega (13) o cambia (14) una medicina él mismo
+    if (pestana == 13 || pestana == 14) {
+        val editando = if (pestana == 14) cambiando else null
+        RecetaScreen(
+            paciente = if (editando != null) "Regresar" else "Mis medicinas",
+            medico = nombre,
+            rol = SesionStore.PACIENTE,
+            ocupado = guardandoMed,
+            aviso = errorMed?.let { AvisoMedico(it, esError = true) },
+            onRegresar = { errorMed = null; pestana = if (editando != null) 3 else 1 },
+            inicial = editando,
+            onGuardar = { m ->
+                guardarMedicina(m) {
+                    pestana = if (editando != null) 3 else 1
+                    avisar(if (editando != null) "Se guardaron los cambios" else "Se agregó ${m.nombre}")
+                }
+            }
+        )
+        return
+    }
+
     // Pantallas que se abren desde Ajustes
     if (pestana in 7..11) {
         val alAjustes = { pestana = 4 }
@@ -311,7 +376,7 @@ fun PacienteApp(
                     onAgregar = { pestana = 5 },
                     onQuitar = { m -> Nube.quitarDelEquipo(m.id) },
                     onIrInicio = { pestana = 0 },
-                    onIrMedicinas = { pestana = 0 }
+                    onIrMedicinas = { pestana = 1 }
                 )
                 5 -> CodigoScreen(
                     estado = estadoCodigo,
@@ -321,7 +386,7 @@ fun PacienteApp(
                     },
                     onReintentar = { intentosCodigo++ },
                     onIrInicio = { pestana = 0 },
-                    onIrMedicinas = { pestana = 0 }
+                    onIrMedicinas = { pestana = 1 }
                 )
                 4 -> AjustesScreen(
                     ajustes = ajustes,
@@ -335,20 +400,30 @@ fun PacienteApp(
                     onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
                     mostrarDemo = false,
                     puedeProbar = false,
-                    onIrMedicinas = { pestana = 0 },
+                    onIrMedicinas = { pestana = 1 },
+                    onIrFamilia = { pestana = 2 }
+                )
+                1 -> MedicinasScreen(
+                    semana = semanaVacia(hoy),
+                    tomadasSemana = 0,
+                    totalSemana = 0,
+                    tomasHoy = emptyList(),
+                    medicinas = emptyList(),
+                    onEscuchar = { lector.leer("Mis medicinas. Todavía no tienes medicinas. Puedes agregar una con el botón.") },
+                    onAgregar = { errorMed = null; pestana = 13 },
+                    onIrInicio = { pestana = 0 },
                     onIrFamilia = { pestana = 2 }
                 )
                 else -> SinMedicinasScreen(
                     nombre = nombre,
+                    acompanantes = equipo.map { it.nombre },
                     onEscuchar = {
-                        lector.leer(
-                            "Todavía no tienes medicinas. Dale tu código a tu médico. " +
-                                "Cuando te agregue una medicina, aparecerá aquí con su alarma."
-                        )
+                        lector.leer("Todavía no tienes medicinas. " + textoSinMedicinas(equipo.map { it.nombre }))
                     },
                     onVerCodigo = { pestana = 5 },
+                    onAgregar = { errorMed = null; pestana = 13 },
                     onAjustes = { pestana = 4 },
-                    onIrMedicinas = { pestana = 0 },
+                    onIrMedicinas = { pestana = 1 },
                     onIrFamilia = { pestana = 2 }
                 )
             }
@@ -356,17 +431,13 @@ fun PacienteApp(
         return
     }
 
-    fun avisar(texto: String) {
-        textoAviso = texto
-        avisos++
-    }
-
     fun registrar(tomada: Boolean, motivo: String?) {
+        val esPrueba = ModoPrueba.activa(context, p.horario.id, p.hoy)
         scope.launch { repo.registrar(p.horario, p.hoy, tomada, motivo) }
         // Ya respondió: se quita la notificación y deja de repetirse
         Notificaciones.quitar(context, p.horario.id)
         Programador.cancelarRepeticion(context, p.horario.id)
-        avisar("Tu respuesta se guardó")
+        avisar(if (esPrueba) "Era una prueba: no se guardó" else "Tu respuesta se guardó")
     }
 
     val medicina = p.medicinas.firstOrNull { it.id == medicinaId } ?: p.medicinas.first()
@@ -382,6 +453,7 @@ fun PacienteApp(
                 medicinas = p.medicinas,
                 onEscuchar = { lector.leer(textoMedicinas(p)) },
                 onAbrirMedicina = { abiertaId = it.id; pestana = 3 },
+                onAgregar = { errorMed = null; pestana = 13 },
                 onIrInicio = { pestana = 0 },
                 onIrFamilia = { pestana = 2 }
             )
@@ -406,15 +478,32 @@ fun PacienteApp(
                 onIrInicio = { pestana = 0 },
                 onIrMedicinas = { pestana = 1 }
             )
-            3 -> DetalleScreen(
+            3 -> {
+                val nubeId = meds.firstOrNull { it.medicina.id == medicina.id }?.medicina?.nubeId
+                val propia = misNube?.firstOrNull { it.id == nubeId }?.takeIf { it.agregadaPor == SesionStore.PACIENTE }
+                DetalleScreen(
                 medicina = medicina,
                 historial = historial,
+                quienLaPuso = misNube?.firstOrNull { it.id == nubeId }?.let { quienLaPuso(it) },
+                onCambiar = propia?.let { n -> { errorMed = null; cambiando = n; pestana = 14 } },
+                onQuitar = propia?.let { n ->
+                    {
+                        scope.launch {
+                            val uid = Nube.miId() ?: return@launch
+                            withTimeoutOrNull(6_000) { Recetas.quitar(uid, n.id) }
+                            pestana = 1
+                            avisar("Se quitó ${n.nombre}")
+                        }
+                        Unit
+                    }
+                },
                 onRegresar = { pestana = 1 },
                 onEscuchar = { lector.leer(textoDetalle(medicina)) },
                 onVerVideo = {}, // el video se conecta después
                 onIrInicio = { pestana = 0 },
                 onIrFamilia = { pestana = 2 }
             )
+            }
             4 -> AjustesScreen(
                 ajustes = ajustes,
                 nombre = nombre,
@@ -496,6 +585,14 @@ fun PacienteApp(
             )
         }
     }
+}
+
+/** "Te la puso tu médico", "Te la puso tu cuidador" o "La agregaste tú". */
+private fun quienLaPuso(m: MedicinaNube): String = when (m.agregadaPor) {
+    SesionStore.MEDICO -> "Te la puso tu médico" + (if (m.quien.isNotBlank()) ": ${m.quien}" else "")
+    SesionStore.FAMILIAR -> "Te la puso tu cuidador" + (if (m.quien.isNotBlank()) ": ${m.quien}" else "")
+    SesionStore.PACIENTE -> "La agregaste tú"
+    else -> ""
 }
 
 /** Qué pantalla abre cada opción de Ajustes (null = no abre nada). */

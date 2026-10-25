@@ -34,11 +34,21 @@ import com.utom.buenvivir.data.PacienteVinculado
 import com.utom.buenvivir.data.PerfilMedico
 import com.utom.buenvivir.data.Vinculos
 import com.utom.buenvivir.data.Recetas
+import com.utom.buenvivir.data.MedicinaNube
 import com.utom.buenvivir.data.SesionStore
 import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.utom.buenvivir.trabajos.AvisosEquipo
+import com.utom.buenvivir.trabajos.Trabajos
 import java.time.LocalTime
 
 /** Antes de entrar: iniciar sesión (M2) o crear cuenta (M3). Sirve para médico y familiar. */
@@ -132,10 +142,24 @@ private fun PantallasMedico(onSalir: () -> Unit) {
     var vinculando by rememberSaveable { mutableStateOf(false) }
     var abierto by remember { mutableStateOf<PacienteVinculado?>(null) }
     var recetando by remember { mutableStateOf(false) }       // M7 abierta para el paciente abierto
+    var cambiando by remember { mutableStateOf<MedicinaNube?>(null) } // la medicina que se está cambiando (o null = nueva)
     var guardando by remember { mutableStateOf(false) }
     var avisoReceta by remember { mutableStateOf<AvisoMedico?>(null) }
     var perfil by remember { mutableStateOf<PerfilMedico?>(null) }
     val pacientes by remember { Vinculos.misPacientes() }.collectAsState(initial = null)
+
+    // Avisos de "no se tomó su pastilla": cada 15 minutos en segundo plano, y cada minuto con la app abierta
+    val pedirPermiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        Trabajos.programarEquipo(context)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) pedirPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
+        while (true) {
+            runCatching { AvisosEquipo.revisar(context) }
+            delay(60_000)
+        }
+    }
 
     LaunchedEffect(Unit) {
         // Si la sesión se cerró por fuera (por ejemplo, se borró la cuenta), regresa a elegir rol
@@ -149,7 +173,7 @@ private fun PantallasMedico(onSalir: () -> Unit) {
     // Atrás: del detalle o de Vincular a la lista; de Mi perfil a Pacientes
     BackHandler(enabled = abierto != null || vinculando || pestana != 0) {
         when {
-            recetando -> { recetando = false; avisoReceta = null }
+            recetando -> { recetando = false; cambiando = null; avisoReceta = null }
             abierto != null -> abierto = null
             vinculando -> vinculando = false
             else -> pestana = 0
@@ -165,15 +189,22 @@ private fun PantallasMedico(onSalir: () -> Unit) {
                 rol = perfil?.rol ?: SesionStore.MEDICO,
                 ocupado = guardando,
                 aviso = avisoReceta,
-                onRegresar = { recetando = false; avisoReceta = null },
+                onRegresar = { recetando = false; cambiando = null; avisoReceta = null },
+                inicial = cambiando,
                 onGuardar = { m ->
                     if (!guardando) scope.launch {
                         guardando = true
                         avisoReceta = null
                         when (val r = Recetas.guardar(p.id, m)) {
                             Resultado.Bien -> {
+                                val eraCambio = cambiando != null
                                 recetando = false
-                                Toast.makeText(context, "Listo, ${m.nombre} se le envió a ${p.nombre}", Toast.LENGTH_SHORT).show()
+                                cambiando = null
+                                Toast.makeText(
+                                    context,
+                                    if (eraCambio) "Listo, se cambió ${m.nombre}" else "Listo, ${m.nombre} se le envió a ${p.nombre}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                             is Resultado.Mal -> avisoReceta = AvisoMedico(r.mensaje, esError = true)
                         }
@@ -186,7 +217,8 @@ private fun PantallasMedico(onSalir: () -> Unit) {
         DetallePacienteScreen(
             p = p,
             onRegresar = { abierto = null },
-            onAgregarMedicina = { recetando = true },
+            onAgregarMedicina = { cambiando = null; recetando = true },
+            onCambiarMedicina = { cambiando = it; recetando = true },
             onQuitar = {
                 scope.launch {
                     when (val r = Vinculos.desvincular(p.id)) {

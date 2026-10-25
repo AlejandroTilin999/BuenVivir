@@ -59,22 +59,27 @@ fun RecetaScreen(
     ocupado: Boolean,
     aviso: AvisoMedico?,
     onRegresar: () -> Unit,
+    inicial: MedicinaNube? = null,          // si viene, es para cambiar esa medicina
     onGuardar: (MedicinaNube) -> Unit
 ) {
-    var busqueda by remember { mutableStateOf("") }
-    var elegida by remember { mutableStateOf<MedicinaCatalogo?>(null) }
-    var aMano by remember { mutableStateOf(false) }          // "No está en la lista"
-    var para by remember { mutableStateOf("") }
+    // Al cambiar una medicina, todo empieza con lo que ya tenía
+    val ini = remember(inicial) { valoresIniciales(inicial) }
+    var busqueda by remember { mutableStateOf(ini.busqueda) }
+    var elegida by remember { mutableStateOf(ini.elegida) }
+    var aMano by remember { mutableStateOf(ini.aMano) }          // "No está en la lista"
+    var para by remember { mutableStateOf(ini.para) }
     var cambiandoPara by remember { mutableStateOf(false) }
-    var presentacion by remember { mutableStateOf<String?>(null) }
-    var cantidad by remember { mutableStateOf<String?>(null) }
-    var otraCantidad by remember { mutableStateOf("") }
-    var momento by remember { mutableStateOf<String?>(null) }
-    var horarios by remember { mutableStateOf(listOf<Int>()) }
+    var presentacion by remember { mutableStateOf(ini.presentacion) }
+    var cantidad by remember { mutableStateOf(ini.cantidad) }
+    var otraCantidad by remember { mutableStateOf(ini.otraCantidad) }
+    var momento by remember { mutableStateOf(ini.momento) }
+    var horarios by remember { mutableStateOf(ini.horarios) }
     var eligiendoHora by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val nombre = elegida?.nombre ?: if (aMano) busqueda.trim() else ""
+    // El paciente agrega sus propias medicinas con la misma pantalla, con textos para él
+    val esPaciente = rol == SesionStore.PACIENTE
     val esInyeccion = elegida?.forma == Forma.INYECCION
     val cuanto = when {
         esInyeccion || aMano || cantidad == OTRA -> otraCantidad.trim()
@@ -104,7 +109,7 @@ fun RecetaScreen(
         val cuando = momento!!
         onGuardar(
             MedicinaNube(
-                id = Recetas.nuevoId(),
+                id = inicial?.id ?: Recetas.nuevoId(),
                 nombre = nombre,
                 para = para.trim(),
                 cantidad = cantidadCompleta,
@@ -130,14 +135,18 @@ fun RecetaScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "Agregar medicina",
+                if (inicial != null) "Cambiar medicina" else "Agregar medicina",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = TextoOscuro,
                 letterSpacing = (-0.5).sp,
                 modifier = Modifier.semantics { heading() }
             )
-            Text("Le llega a $paciente en cuanto la guardes.", fontSize = 17.sp, lineHeight = 24.sp, color = TextoSecundario)
+            Text(
+                if (esPaciente) "Escríbela como te la indicó tu médico. Te sonará la alarma a las horas que elijas."
+                else "Le llega a $paciente en cuanto la guardes.",
+                fontSize = 17.sp, lineHeight = 24.sp, color = TextoSecundario
+            )
         }
 
         // ---- Medicina: buscar en el catálogo ----
@@ -149,7 +158,11 @@ fun RecetaScreen(
                     busqueda = it
                     if (elegida != null && it != elegida?.nombre) { elegida = null; presentacion = null; para = "" }
                 },
-                ayuda = if (aMano) "Escribe el nombre como lo dirías al paciente." else null
+                ayuda = when {
+                    !aMano -> null
+                    esPaciente -> "Escribe el nombre como viene en la caja."
+                    else -> "Escribe el nombre como lo dirías al paciente."
+                }
             )
             val resultados = if (elegida == null && !aMano) CatalogoMedicinas.buscar(busqueda) else emptyList()
             if (elegida == null && !aMano && busqueda.isNotBlank()) {
@@ -218,14 +231,14 @@ fun RecetaScreen(
                         )
                     }
                     Text(para, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextoOscuro)
-                    Text("Así se lo explica la app al paciente.", fontSize = 14.sp, color = TextoLavanda)
+                    Text(if (esPaciente) "Así te lo explica la app." else "Así se lo explica la app al paciente.", fontSize = 14.sp, color = TextoLavanda)
                 }
             } else {
                 Campo(
                     etiqueta = "Para qué sirve",
                     valor = para,
                     onCambio = { para = it },
-                    ayuda = "Ejemplo: Para controlar el azúcar. Así se lo explica la app al paciente."
+                    ayuda = if (esPaciente) "Ejemplo: Para controlar el azúcar." else "Ejemplo: Para controlar el azúcar. Así se lo explica la app al paciente."
                 )
             }
 
@@ -313,7 +326,7 @@ fun RecetaScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text("Así lo verá $paciente", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextoLavanda)
+                    Text(if (esPaciente) "Así lo verás" else "Así lo verá $paciente", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextoLavanda)
                     Text(
                         buildAnnotatedString {
                             append("$nombre: toma ")
@@ -334,7 +347,14 @@ fun RecetaScreen(
 
         (error ?: aviso?.texto)?.let { Aviso(AvisoMedico(it, esError = true)) }
 
-        BotonPrincipal("Guardar y enviar", ocupado = ocupado, onClick = ::guardar)
+        BotonPrincipal(
+            when {
+                inicial != null -> "Guardar cambios"
+                esPaciente -> "Guardar"
+                else -> "Guardar y enviar"
+            },
+            ocupado = ocupado, onClick = ::guardar
+        )
     }
 
     if (eligiendoHora) {
@@ -345,6 +365,39 @@ fun RecetaScreen(
                 if (m !in horarios) horarios = horarios + m
             }
         )
+    }
+}
+
+/** Lo que ya tenía la medicina, acomodado en los campos de la pantalla. */
+private class ValoresIniciales(
+    val busqueda: String = "",
+    val elegida: MedicinaCatalogo? = null,
+    val aMano: Boolean = false,
+    val para: String = "",
+    val presentacion: String? = null,
+    val cantidad: String? = null,
+    val otraCantidad: String = "",
+    val momento: String? = null,
+    val horarios: List<Int> = emptyList()
+)
+
+private fun valoresIniciales(m: MedicinaNube?): ValoresIniciales {
+    if (m == null) return ValoresIniciales()
+    val cat = CatalogoMedicinas.lista.firstOrNull { it.nombre.equals(m.nombre, ignoreCase = true) }
+    val momento = m.indicacion.takeIf { it in MOMENTOS }
+    val horas = m.horarios.map { it.minutos }
+    // "1 tableta de 850 mg" -> cuánto = "1 tableta", presentación = "850 mg"
+    val partes = m.cantidad.split(" de ", limit = 2)
+    val presentacion = partes.getOrNull(1)?.takeIf { p -> cat?.presentaciones?.contains(p) == true }
+    val cuanto = if (presentacion != null) partes[0] else m.cantidad
+    return when {
+        cat == null -> ValoresIniciales(m.nombre, null, true, m.para, null, null, m.cantidad, momento, horas)
+        cat.forma == Forma.INYECCION ->
+            ValoresIniciales(m.nombre, cat, false, m.para, presentacion ?: cat.presentaciones.singleOrNull(), null, cuanto.removeSuffix(" unidades"), momento, horas)
+        cuanto in CANTIDADES_TABLETA ->
+            ValoresIniciales(m.nombre, cat, false, m.para, presentacion ?: cat.presentaciones.singleOrNull(), cuanto, "", momento, horas)
+        else ->
+            ValoresIniciales(m.nombre, cat, false, m.para, presentacion ?: cat.presentaciones.singleOrNull(), OTRA, cuanto, momento, horas)
     }
 }
 

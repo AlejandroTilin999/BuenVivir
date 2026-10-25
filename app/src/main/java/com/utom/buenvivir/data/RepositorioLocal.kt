@@ -6,6 +6,7 @@ import com.utom.buenvivir.data.db.BuenVivirDb
 import com.utom.buenvivir.data.db.HorarioEntity
 import com.utom.buenvivir.data.db.MedicinaEntity
 import com.utom.buenvivir.data.db.TomaEntity
+import com.utom.buenvivir.alarmas.ModoPrueba
 import com.utom.buenvivir.reloj.Reloj
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +25,10 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
 
     fun ultimasTomas(medicinaId: Long, limite: Int = 5) = dao.ultimasTomas(medicinaId, limite)
 
-    /** Registra si se tomó o no una pastilla. Si ya estaba registrada, la corrige. */
+    /**
+     * Registra si se tomó o no una pastilla. Si ya estaba registrada, la corrige.
+     * Si era la alarma de "Probar recordatorio", no guarda nada (solo quita el aviso del reloj).
+     */
     suspend fun registrar(
         horario: HorarioEntity,
         fecha: LocalDate,
@@ -32,6 +36,10 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
         motivo: String?,
         registradaEn: Long = System.currentTimeMillis()   // el reloj manda la hora real en que contestó
     ) {
+        if (ModoPrueba.consumir(contexto, horario.id, fecha)) {
+            Reloj.listo(contexto, horario.id, fecha)
+            return
+        }
         val toma = TomaEntity(
             medicinaId = horario.medicinaId,
             horarioId = horario.id,

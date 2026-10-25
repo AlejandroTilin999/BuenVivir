@@ -59,6 +59,8 @@ dependencies {
     implementation(libs.firebase.auth)
     // Comunicación con la app del reloj (Wear OS)
     implementation(libs.play.services.wearable)
+    // Trabajos en segundo plano: revisar medicinas y avisar al médico/cuidador aunque la app esté cerrada
+    implementation(libs.androidx.work.runtime)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

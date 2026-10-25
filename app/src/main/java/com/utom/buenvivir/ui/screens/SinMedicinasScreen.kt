@@ -36,8 +36,10 @@ import com.utom.buenvivir.ui.theme.*
 @Composable
 fun SinMedicinasScreen(
     nombre: String,
+    acompanantes: List<String> = emptyList(),   // nombres de su médico o cuidador, si ya tiene
     onEscuchar: () -> Unit = {},
     onVerCodigo: () -> Unit = {},
+    onAgregar: () -> Unit = {},
     onAjustes: () -> Unit = {},
     onIrMedicinas: () -> Unit = {},
     onIrFamilia: () -> Unit = {}
@@ -108,13 +110,13 @@ fun SinMedicinasScreen(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    "Dale tu código a tu médico. Cuando te agregue una medicina, aparecerá aquí con su alarma.",
+                    textoSinMedicinas(acompanantes),
                     fontSize = 19.sp,
                     lineHeight = 26.sp,
                     color = TextoSecundario,
                     textAlign = TextAlign.Center
                 )
-                Button(
+                if (acompanantes.isEmpty()) Button(
                     onClick = onVerCodigo,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(64.dp),
                     shape = RoundedCornerShape(32.dp),
@@ -122,11 +124,32 @@ fun SinMedicinasScreen(
                 ) {
                     Text("Ver mi código", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                 }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .border(2.dp, AzulBoton, RoundedCornerShape(32.dp))
+                        .clickable(role = Role.Button, onClick = onAgregar),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Agregar una medicina", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AzulBoton)
+                }
             }
         }
 
         MenuInferior(seleccionado = 0, onInicio = {}, onMedicinas = onIrMedicinas, onFamilia = onIrFamilia)
     }
+}
+
+/**
+ * Sin médico ni cuidador: se le pide dar su código.
+ * Si ya tiene: "Alejandro todavía no te agrega medicinas…" (no tiene sentido pedirle el código otra vez).
+ */
+fun textoSinMedicinas(acompanantes: List<String>): String = when (acompanantes.size) {
+    0 -> "Dale tu código a tu médico para que te agregue tus medicinas."
+    1 -> "${acompanantes[0]} aún no te agrega medicinas."
+    else -> "${acompanantes.dropLast(1).joinToString(", ")} y ${acompanantes.last()} aún no te agregan medicinas."
 }
 
 @Preview(name = "Sin medicinas", widthDp = 360, heightDp = 800, showBackground = true)

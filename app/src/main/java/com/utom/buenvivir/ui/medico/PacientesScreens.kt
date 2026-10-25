@@ -434,7 +434,8 @@ fun DetallePacienteScreen(
     p: PacienteVinculado,
     onRegresar: () -> Unit,
     onQuitar: () -> Unit,
-    onAgregarMedicina: () -> Unit = {}
+    onAgregarMedicina: () -> Unit = {},
+    onCambiarMedicina: (MedicinaNube) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val medicinas by remember(p.id) { Recetas.escuchar(p.id) }.collectAsState(initial = null)
@@ -498,6 +499,7 @@ fun DetallePacienteScreen(
                 puedeQuitar = { m -> !esCuidador || (cuidadorLibre && m.agregadaPor != SesionStore.MEDICO) },
                 nota = if (esCuidador && conMedico == true) "Solo su médico puede cambiar sus medicinas." else null,
                 onQuitar = { porQuitar = it },
+                onCambiar = onCambiarMedicina,
                 onAgregar = onAgregarMedicina
             )
             errorMedicina?.let { Aviso(AvisoMedico(it, esError = true)) }
@@ -732,6 +734,7 @@ private fun Medicinas(
     puedeQuitar: (MedicinaNube) -> Boolean,
     nota: String?,
     onQuitar: (MedicinaNube) -> Unit,
+    onCambiar: (MedicinaNube) -> Unit,
     onAgregar: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -764,16 +767,29 @@ private fun Medicinas(
                             color = TextoChip
                         )
                     }
-                    if (puedeQuitar(m)) Text(
-                        "Quitar",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextoChip,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(role = Role.Button) { onQuitar(m) }
-                            .padding(horizontal = 10.dp, vertical = 12.dp)
-                    )
+                    // Cambiar y Quitar: con los mismos permisos (el cuidador no toca lo que recetó el médico)
+                    if (puedeQuitar(m)) Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "Cambiar",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AzulBoton,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(role = Role.Button) { onCambiar(m) }
+                                .padding(horizontal = 10.dp, vertical = 10.dp)
+                        )
+                        Text(
+                            "Quitar",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextoChip,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(role = Role.Button) { onQuitar(m) }
+                                .padding(horizontal = 10.dp, vertical = 10.dp)
+                        )
+                    }
                 }
             }
         }

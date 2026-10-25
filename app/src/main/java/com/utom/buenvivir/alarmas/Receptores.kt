@@ -58,8 +58,9 @@ class AlarmaReceiver : BroadcastReceiver() {
         android.util.Log.i("Reloj", "Alarma: avisarEnReloj=${ajustes.avisarEnReloj}, intento=$intento")
         if (ajustes.avisarEnReloj && intento == 0) Reloj.avisar(ctx, h, m, fecha, ajustes.vibrarEnReloj, ajustes.sonarEnReloj, prueba)
 
-        // Siguiente aviso (el último solo revisa si respondió)
-        Programador.programarRepeticion(ctx, horarioId, fecha, intento + 1, ajustes.repetirMinutos)
+        // Siguiente aviso (el último solo revisa si respondió). La prueba suena una sola vez,
+        // así no termina guardando "No hubo respuesta".
+        if (!prueba) Programador.programarRepeticion(ctx, horarioId, fecha, intento + 1, ajustes.repetirMinutos)
     }
 }
 

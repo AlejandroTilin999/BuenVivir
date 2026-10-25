@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.utom.buenvivir.data.Cuenta
 import com.utom.buenvivir.data.RepositorioLocal
 import com.utom.buenvivir.data.SesionStore
+import com.utom.buenvivir.trabajos.Trabajos
 import com.utom.buenvivir.ui.medico.AccesoMedico
 import com.utom.buenvivir.ui.medico.MedicoApp
 import com.utom.buenvivir.ui.screens.RolElegido
@@ -67,7 +68,10 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
         rol == SesionStore.PACIENTE -> PacienteApp(
             nombre = nombre!!,
             onCambiarNombre = { scope.launch { sesion.guardarNombre(it) } },
-            onDejarDeSerPaciente = { scope.launch { sesion.olvidar() } },
+            onDejarDeSerPaciente = {
+                Trabajos.cancelarTodos(context)
+                scope.launch { sesion.olvidar() }
+            },
             abrirMotivo = abrirMotivo,
             onMotivoAbierto = onMotivoAbierto
         )
@@ -76,6 +80,7 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
         rol == SesionStore.MEDICO || rol == SesionStore.FAMILIAR -> MedicoApp(
             rol = rol!!,
             onSalir = {
+                Trabajos.cancelarTodos(context)
                 Cuenta.salir()
                 entrandoComo = null
                 guardar(null)

@@ -10,7 +10,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,8 +48,12 @@ fun DetalleScreen(
     onEscuchar: () -> Unit = {},
     onVerVideo: () -> Unit = {},
     onIrInicio: () -> Unit = {},
-    onIrFamilia: () -> Unit = {}
+    onIrFamilia: () -> Unit = {},
+    quienLaPuso: String? = null,              // "Te la puso tu médico: Dra. Ana", "La agregaste tú"
+    onCambiar: (() -> Unit)? = null,          // solo si la agregó él mismo
+    onQuitar: (() -> Unit)? = null
 ) {
+    var confirmarQuitar by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,12 +69,53 @@ fun DetalleScreen(
         ) {
             Regresar(onRegresar)
             Encabezado(medicina)
+            if (!quienLaPuso.isNullOrBlank()) {
+                Text(quienLaPuso, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TextoLavanda)
+            }
             ComoTomarla(medicina, onEscuchar)
             Video(medicina.video, onVerVideo)
             UltimasTomas(historial)
+            if (onCambiar != null || onQuitar != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    onCambiar?.let { BotonBorde("Cambiar", AzulBoton, Modifier.weight(1f), it) }
+                    onQuitar?.let { BotonBorde("Quitar", GrisAviso, Modifier.weight(1f)) { confirmarQuitar = true } }
+                }
+            }
         }
 
         MenuInferior(seleccionado = 1, onInicio = onIrInicio, onMedicinas = onRegresar, onFamilia = onIrFamilia)
+    }
+
+    if (confirmarQuitar && onQuitar != null) {
+        AlertDialog(
+            onDismissRequest = { confirmarQuitar = false },
+            title = { Text("¿Quitar ${medicina.nombre}?", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Dejará de sonar su alarma.", fontSize = 18.sp) },
+            confirmButton = {
+                TextButton(onClick = { confirmarQuitar = false; onQuitar() }) {
+                    Text("Sí, quitar", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GrisAviso)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarQuitar = false }) {
+                    Text("No", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BotonBorde(texto: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(58.dp)
+            .clip(RoundedCornerShape(29.dp))
+            .border(2.dp, color, RoundedCornerShape(29.dp))
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(texto, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color)
     }
 }
 

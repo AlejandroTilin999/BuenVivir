@@ -53,6 +53,7 @@ fun MedicinasScreen(
     medicinas: List<Medicina>,
     onEscuchar: () -> Unit = {},
     onAbrirMedicina: (Medicina) -> Unit = {},
+    onAgregar: () -> Unit = {},
     onIrInicio: () -> Unit = {},
     onIrFamilia: () -> Unit = {}
 ) {
@@ -70,9 +71,13 @@ fun MedicinasScreen(
                 .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Seccion("Hoy") { TarjetaHoy(tomasHoy) }
+            if (tomasHoy.isNotEmpty()) Seccion("Hoy") { TarjetaHoy(tomasHoy) }
             Seccion("Tus medicinas") {
+                if (medicinas.isEmpty()) {
+                    Text("Todavía no tienes medicinas.", fontSize = 19.sp, color = TextoSecundario)
+                }
                 medicinas.forEach { TarjetaMedicina(it) { onAbrirMedicina(it) } }
+                BotonAgregar(onAgregar)
             }
         }
 
@@ -252,6 +257,24 @@ private fun ChipEstado(estado: EstadoToma) {
 }
 
 private data class Estilo(val texto: String, val icono: ImageVector, val fondo: Color, val color: Color)
+
+@Composable
+private fun BotonAgregar(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .clip(RoundedCornerShape(30.dp))
+            .border(2.dp, AzulBoton, RoundedCornerShape(30.dp))
+            .clickable(role = Role.Button, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Iconos.Mas, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Agregar una medicina", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = AzulBoton)
+    }
+}
 
 @Composable
 private fun TarjetaMedicina(medicina: Medicina, onClick: () -> Unit) {

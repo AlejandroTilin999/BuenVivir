@@ -142,3 +142,13 @@ fun historialDe(tomas: List<TomaEntity>, hoy: LocalDate): List<TomaPasada> = tom
         horaReal = if (it.tomada) horaDeRegistro(it.registradaEn) else null
     )
 }
+
+/** La semana cuando todavía no tiene medicinas: todos los días vacíos y hoy marcado. */
+fun semanaVacia(hoy: java.time.LocalDate): List<DiaSemana> {
+    val lunes = hoy.minusDays(hoy.dayOfWeek.value - 1L)
+    val letras = listOf("L", "M", "M", "J", "V", "S", "D")
+    return (0..6).map { i ->
+        val fecha = lunes.plusDays(i.toLong())
+        DiaSemana(letras[i], if (fecha == hoy) "Hoy" else nombreDia(fecha), if (fecha == hoy) EstadoDia.Hoy else EstadoDia.Futuro)
+    }
+}

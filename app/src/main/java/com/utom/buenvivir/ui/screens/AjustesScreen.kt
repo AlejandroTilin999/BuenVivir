@@ -165,12 +165,6 @@ fun AjustesScreen(
                     FilaInterruptor("Vibrar en el reloj", ajustes.vibrarEnReloj) { onCambiar(ajustes.copy(vibrarEnReloj = it)) }
                     Divisor()
                     FilaInterruptor("Sonar en el reloj", ajustes.sonarEnReloj) { onCambiar(ajustes.copy(sonarEnReloj = it)) }
-                    Divisor()
-                    FilaInterruptor(
-                        "Registrar desde el reloj",
-                        ajustes.registrarDesdeReloj,
-                        detalle = "Marca tu pastilla desde la muñeca"
-                    ) { onCambiar(ajustes.copy(registrarDesdeReloj = it)) }
                 }
             }
 
