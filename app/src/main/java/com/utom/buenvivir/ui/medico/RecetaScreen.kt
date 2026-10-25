@@ -16,6 +16,13 @@ import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.*
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.utom.buenvivir.data.Voz
+import com.utom.buenvivir.ui.components.rememberLector
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,7 +115,7 @@ fun RecetaScreen(
         if (error != null) return
         val cuando = momento!!
         onGuardar(
-            MedicinaNube(
+            Recetas.conCambio(inicial, MedicinaNube(
                 id = inicial?.id ?: Recetas.nuevoId(),
                 nombre = nombre,
                 para = para.trim(),
@@ -117,8 +124,109 @@ fun RecetaScreen(
                 horarios = horarios.sorted().mapIndexed { i, m -> HorarioNube("h$i", m, cuando) },
                 agregadaPor = rol,
                 quien = medico
-            )
+            ))
         )
+    }
+
+    // ---------- Asistente de voz (solo el paciente) ----------
+    // La app pregunta en voz alta, abre el micrófono de Google y va llenando el formulario.
+    val lector = if (esPaciente) rememberLector() else null
+    var paso by remember { mutableStateOf<PasoVoz?>(null) }
+    var fallos by remember { mutableIntStateOf(0) }
+
+    fun resumenVoz(): String {
+        val horas = horarios.sorted().joinToString(" y ") { horaTexto(it) }
+        return buildString {
+            append("Listo. $nombre")
+            if (cantidadCompleta.isNotEmpty()) append(", $cantidadCompleta")
+            momento?.let { append(", $it") }
+            if (horas.isNotEmpty()) append(", a las $horas")
+            append(". Revisa que esté bien y toca Guardar.")
+        }
+    }
+
+    // Lo que contestó: se guarda aquí y abajo se procesa
+    var respuesta by remember { mutableStateOf<Pair<PasoVoz, String>?>(null) }
+    val microfono = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val oido = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        val actual = paso
+        if (oido.isNullOrBlank() || actual == null) paso = null   // canceló o no dijo nada
+        else respuesta = actual to oido
+    }
+
+    fun preguntar(nuevo: PasoVoz?, antes: String = "") {
+        paso = nuevo
+        val l = lector ?: return
+        if (nuevo == null) return
+        if (nuevo == PasoVoz.Listo) { paso = null; l.decir(resumenVoz()); return }
+        val pregunta = antes + preguntaDe(nuevo)
+        l.decirYLuego(pregunta) {
+            val intento = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, preguntaDe(nuevo))
+            try {
+                microfono.launch(intento)
+            } catch (_: ActivityNotFoundException) {
+                paso = null
+                error = "Este celular no tiene reconocimiento de voz. Llena los datos con el teclado."
+            }
+        }
+    }
+
+    // Lo que se entendió en cada paso, y cuál sigue
+    fun procesar(actual: PasoVoz, oido: String) {
+        var entendio = true
+        val siguiente: PasoVoz = when (actual) {
+            PasoVoz.Nombre -> {
+                val m = CatalogoMedicinas.encontrarEnFrase(oido)
+                if (m != null) elegir(m) else {
+                    elegida = null; aMano = true; para = ""
+                    busqueda = oido.trim().replaceFirstChar(Char::uppercase)
+                }
+                if (m != null && m.presentaciones.size > 1) PasoVoz.Presentacion else PasoVoz.Cantidad
+            }
+            PasoVoz.Presentacion -> {
+                val op = elegida?.let { Voz.presentacion(oido, it.presentaciones) }
+                if (op != null) presentacion = op else entendio = false
+                PasoVoz.Cantidad
+            }
+            PasoVoz.Cantidad -> {
+                val c = Voz.cantidad(oido, esInyeccion)
+                if (c == null) entendio = false
+                else if (esInyeccion || aMano) otraCantidad = c
+                else if (c in CANTIDADES_TABLETA) { cantidad = c; otraCantidad = "" }
+                else { cantidad = OTRA; otraCantidad = c }
+                PasoVoz.Momento
+            }
+            PasoVoz.Momento -> {
+                val m = Voz.momento(oido)
+                if (m != null) momento = m else entendio = false
+                PasoVoz.Hora
+            }
+            PasoVoz.Hora -> {
+                val h = Voz.hora(oido)
+                if (h != null) { if (h !in horarios) horarios = horarios + h } else entendio = false
+                PasoVoz.OtraHora
+            }
+            PasoVoz.OtraHora -> when (Voz.siONo(oido)) {
+                true -> PasoVoz.Hora
+                false -> PasoVoz.Listo
+                null -> { entendio = false; PasoVoz.Listo }
+            }
+            PasoVoz.Listo -> PasoVoz.Listo
+        }
+        // Si no le entendió, le pregunta otra vez (una sola vez); después sigue y se llena a mano
+        if (!entendio && fallos == 0) {
+            fallos = 1
+            preguntar(actual, "No te entendí. ")
+        } else {
+            fallos = 0
+            preguntar(siguiente)
+        }
+    }
+    LaunchedEffect(respuesta) {
+        respuesta?.let { (actual, oido) -> respuesta = null; procesar(actual, oido) }
     }
 
     Column(
@@ -146,6 +254,15 @@ fun RecetaScreen(
                 if (esPaciente) "Escríbela como te la indicó tu médico. Te sonará la alarma a las horas que elijas."
                 else "Le llega a $paciente en cuanto la guardes.",
                 fontSize = 17.sp, lineHeight = 24.sp, color = TextoSecundario
+            )
+        }
+
+        if (esPaciente && inicial == null) {
+            BotonVoz(
+                escuchando = paso != null,
+                onClick = {
+                    if (paso != null) { paso = null; lector?.callar() } else { fallos = 0; preguntar(PasoVoz.Nombre) }
+                }
             )
         }
 
@@ -365,6 +482,52 @@ fun RecetaScreen(
                 if (m !in horarios) horarios = horarios + m
             }
         )
+    }
+}
+
+/** Las preguntas del asistente de voz, en orden. */
+private enum class PasoVoz { Nombre, Presentacion, Cantidad, Momento, Hora, OtraHora, Listo }
+
+private fun preguntaDe(p: PasoVoz): String = when (p) {
+    PasoVoz.Nombre -> "¿Cómo se llama tu medicina?"
+    PasoVoz.Presentacion -> "¿De cuántos miligramos es? Lo dice la caja."
+    PasoVoz.Cantidad -> "¿Cuánto tomas cada vez? Por ejemplo: una pastilla, media o dos."
+    PasoVoz.Momento -> "¿La tomas antes de comer, con la comida o después de comer?"
+    PasoVoz.Hora -> "¿A qué hora la tomas? Por ejemplo: a las 8 de la mañana."
+    PasoVoz.OtraHora -> "¿La tomas a otra hora más? Di sí o no."
+    PasoVoz.Listo -> ""
+}
+
+/** Botón grande para llenar la medicina hablando. */
+@Composable
+private fun BotonVoz(escuchando: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(if (escuchando) AzulBoton else Lavanda)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(26.dp)).background(Blanco),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Iconos.Microfono, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(30.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                if (escuchando) "Te estoy preguntando…" else "Dímela con tu voz",
+                fontSize = 21.sp, fontWeight = FontWeight.ExtraBold,
+                color = if (escuchando) Blanco else TextoOscuro
+            )
+            Text(
+                if (escuchando) "Toca aquí para parar." else "Te pregunto y tú me contestas.",
+                fontSize = 16.sp, color = if (escuchando) Blanco else TextoLavanda
+            )
+        }
     }
 }
 

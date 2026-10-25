@@ -74,6 +74,13 @@ object CatalogoMedicinas {
         return lista.filter { sinAcentos(it.nombre).contains(t) }
     }
 
+    /** Para la voz: encuentra la medicina dentro de una frase ("es la metformina de 850"). */
+    fun encontrarEnFrase(frase: String): MedicinaCatalogo? {
+        val f = sinAcentos(frase)
+        return lista.firstOrNull { f.contains(sinAcentos(it.nombre)) }
+            ?: lista.firstOrNull { m -> f.contains(sinAcentos(m.nombre).substringBefore(" ")) }
+    }
+
     private fun sinAcentos(s: String) = java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD)
         .replace(Regex("\\p{M}"), "")
 }

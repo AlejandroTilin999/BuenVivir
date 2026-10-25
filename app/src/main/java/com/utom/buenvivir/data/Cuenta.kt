@@ -175,7 +175,9 @@ object Cuenta {
             "ERROR_INVALID_EMAIL" -> "Ese correo no está bien escrito."
             "ERROR_WRONG_PASSWORD", "ERROR_INVALID_CREDENTIAL", "ERROR_USER_NOT_FOUND" ->
                 "El correo o la contraseña no son correctos."
-            "ERROR_EMAIL_ALREADY_IN_USE" -> "Ya hay una cuenta con ese correo. Mejor inicia sesión."
+            "ERROR_EMAIL_ALREADY_IN_USE", "ERROR_CREDENTIAL_ALREADY_IN_USE" -> "Ya hay una cuenta con ese correo. Usa otro."
+            "ERROR_PROVIDER_ALREADY_LINKED" -> "Tu cuenta ya está respaldada."
+            "ERROR_REQUIRES_RECENT_LOGIN" -> "Por seguridad, vuelve a intentarlo en un momento."
             "ERROR_WEAK_PASSWORD" -> "Esa contraseña es muy fácil de adivinar. Usa una más larga."
             "ERROR_USER_DISABLED" -> "Esta cuenta está desactivada."
             else -> "No se pudo. Intenta otra vez."

@@ -45,6 +45,7 @@ import com.utom.buenvivir.alarmas.ModoPrueba
 import com.utom.buenvivir.alarmas.PruebaRapida
 import com.utom.buenvivir.reloj.Reloj
 import com.utom.buenvivir.trabajos.Trabajos
+import com.utom.buenvivir.trabajos.AvisosDosis
 import com.google.android.gms.wearable.Wearable
 import com.utom.buenvivir.data.AjustesStore
 import com.utom.buenvivir.data.RepositorioLocal
@@ -70,6 +71,8 @@ import com.utom.buenvivir.ui.screens.MedicinasScreen
 import com.utom.buenvivir.ui.screens.MotivoSheet
 import com.utom.buenvivir.ui.screens.SinMedicinasScreen
 import com.utom.buenvivir.ui.screens.textoSinMedicinas
+import com.utom.buenvivir.ui.screens.RespaldoScreen
+import com.utom.buenvivir.ui.screens.TEXTO_RESPALDO
 import com.utom.buenvivir.ui.screens.NombreScreen
 import com.utom.buenvivir.ui.screens.TonoScreen
 import com.utom.buenvivir.ui.screens.MiMedicoScreen
@@ -145,7 +148,10 @@ fun PacienteApp(
         // si su médico o su familia le agregan o cambian una medicina, aquí aparece sola con sus alarmas
         repo.subirSinNube()
         Nube.escucharMisMedicinas().collect { lista ->
-            if (lista != null && repo.sincronizar(lista)) Programador.programarTodas(context)
+            if (lista == null) return@collect
+            // Si su médico o su cuidador le cambiaron la dosis, le llega una notificación
+            AvisosDosis.revisar(context, lista)
+            if (repo.sincronizar(lista)) Programador.programarTodas(context)
         }
     }
 
@@ -220,7 +226,7 @@ fun PacienteApp(
         pestana = when (pestana) {
             3 -> 1 // del detalle, a Mis medicinas
             5 -> 2 // de Mi código, a Mi familia
-            in 6..12 -> 4 // de Mi nombre, Tono, Mi médico, Privacidad, Ayuda, Acerca de o Quién usa, a Ajustes
+            in 6..12, 15 -> 4 // de Mi nombre, Tono, Mi médico, Privacidad, Ayuda, Acerca de, Quién usa o Respaldar, a Ajustes
             13 -> 1 // de Agregar medicina, a Mis medicinas
             14 -> 3 // de Cambiar medicina, a su detalle
             else -> 0
@@ -238,6 +244,9 @@ fun PacienteApp(
     // Sus medicinas como están en Firebase: para saber cuáles agregó él mismo (esas las puede cambiar o quitar)
     val misNube by remember { Nube.escucharMisMedicinas() }.collectAsState(initial = null)
     var cambiando by remember { mutableStateOf<MedicinaNube?>(null) }
+    var correoRespaldo by remember { mutableStateOf(Nube.correoDeRespaldo()) }
+    var respaldando by remember { mutableStateOf(false) }
+    var avisoRespaldo by remember { mutableStateOf<AvisoMedico?>(null) }
     var guardandoMed by remember { mutableStateOf(false) }
     var errorMed by remember { mutableStateOf<String?>(null) }
 
@@ -306,6 +315,32 @@ fun PacienteApp(
                         "hay que borrar sus datos. Se borran sus medicinas, sus alarmas y su historial. No se puede deshacer."
                 )
             }
+        )
+        return
+    }
+
+    // Ajustes → Respaldar mi cuenta: correo y contraseña para recuperarla en otro celular
+    if (pestana == 15) {
+        RespaldoScreen(
+            correoActual = correoRespaldo,
+            ocupado = respaldando,
+            aviso = avisoRespaldo,
+            onRespaldar = { correo, contrasena ->
+                if (!respaldando) scope.launch {
+                    respaldando = true
+                    avisoRespaldo = null
+                    when (val r = Nube.respaldar(correo, contrasena)) {
+                        Resultado.Bien -> {
+                            correoRespaldo = Nube.correoDeRespaldo()
+                            avisar("Tu cuenta quedó respaldada")
+                        }
+                        is Resultado.Mal -> avisoRespaldo = AvisoMedico(r.mensaje, esError = true)
+                    }
+                    respaldando = false
+                }
+            },
+            onRegresar = { avisoRespaldo = null; pestana = 4 },
+            onEscuchar = { lector.leer(TEXTO_RESPALDO) }
         )
         return
     }
@@ -398,6 +433,7 @@ fun PacienteApp(
                     onRegresar = { pestana = 0 },
                     onEscuchar = { lector.leer(textoAjustes(ajustes)) },
                     onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
+                    respaldada = correoRespaldo != null,
                     mostrarDemo = false,
                     puedeProbar = false,
                     onIrMedicinas = { pestana = 1 },
@@ -485,6 +521,7 @@ fun PacienteApp(
                 medicina = medicina,
                 historial = historial,
                 quienLaPuso = misNube?.firstOrNull { it.id == nubeId }?.let { quienLaPuso(it) },
+                cambios = misNube?.firstOrNull { it.id == nubeId }?.cambios.orEmpty(),
                 onCambiar = propia?.let { n -> { errorMed = null; cambiando = n; pestana = 14 } },
                 onQuitar = propia?.let { n ->
                     {
@@ -514,6 +551,7 @@ fun PacienteApp(
                 onRegresar = { pestana = 0 },
                 onEscuchar = { lector.leer(textoAjustes(ajustes)) },
                     onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
+                    respaldada = correoRespaldo != null,
                 onProbarRecordatorio = {
                     PruebaRapida.programar(context, p.horario.id, p.hoy)
                     avisar("Sonará en ${PruebaRapida.SEGUNDOS} segundos")
@@ -604,6 +642,7 @@ private fun pestanaDeOpcion(opcion: String): Int? = when (opcion) {
     "Ayuda" -> 10
     "Acerca de BuenVivir" -> 11
     "Quién usa este celular" -> 12
+    "Respaldar mi cuenta" -> 15
     else -> null
 }
 

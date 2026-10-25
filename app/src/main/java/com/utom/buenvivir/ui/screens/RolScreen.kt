@@ -3,6 +3,7 @@ package com.utom.buenvivir.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -33,7 +34,7 @@ enum class RolElegido { Paciente, Familiar, Medico }
 
 /** M1: la primera vez que se abre la app en un celular. */
 @Composable
-fun RolScreen(onContinuar: (RolElegido) -> Unit) {
+fun RolScreen(onYaTenia: () -> Unit = {}, onContinuar: (RolElegido) -> Unit) {
     var elegido by rememberSaveable { mutableStateOf<RolElegido?>(null) }
 
     Column(
@@ -77,6 +78,19 @@ fun RolScreen(onContinuar: (RolElegido) -> Unit) {
                 elegido == RolElegido.Familiar) { elegido = RolElegido.Familiar }
             OpcionRol("Soy médico", "Doy recetas y sigo a mis pacientes", Iconos.Estetoscopio,
                 elegido == RolElegido.Medico) { elegido = RolElegido.Medico }
+            // Paciente que cambió de celular y respaldó su cuenta
+            Text(
+                "Ya usaba BuenVivir como paciente en otro celular",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AzulBoton,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onYaTenia)
+                    .padding(vertical = 14.dp, horizontal = 8.dp)
+            )
         }
 
         Box(

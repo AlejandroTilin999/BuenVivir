@@ -31,6 +31,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.utom.buenvivir.data.CambioDosis
 import com.utom.buenvivir.data.Medicina
 import com.utom.buenvivir.data.Repositorio
 import com.utom.buenvivir.data.TomaPasada
@@ -50,6 +51,7 @@ fun DetalleScreen(
     onIrInicio: () -> Unit = {},
     onIrFamilia: () -> Unit = {},
     quienLaPuso: String? = null,              // "Te la puso tu médico: Dra. Ana", "La agregaste tú"
+    cambios: List<CambioDosis> = emptyList(), // cambios de dosis, para que sepa qué cambió y quién
     onCambiar: (() -> Unit)? = null,          // solo si la agregó él mismo
     onQuitar: (() -> Unit)? = null
 ) {
@@ -75,6 +77,7 @@ fun DetalleScreen(
             ComoTomarla(medicina, onEscuchar)
             Video(medicina.video, onVerVideo)
             UltimasTomas(historial)
+            if (cambios.isNotEmpty()) CambiosDeDosis(cambios)
             if (onCambiar != null || onQuitar != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     onCambiar?.let { BotonBorde("Cambiar", AzulBoton, Modifier.weight(1f), it) }
@@ -102,6 +105,35 @@ fun DetalleScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun CambiosDeDosis(cambios: List<CambioDosis>) {
+    val formato = java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM", java.util.Locale.forLanguageTag("es-MX"))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Titulo("Cambios en tu dosis")
+        cambios.sortedByDescending { it.fecha }.take(5).forEach { c ->
+            val fecha = java.time.Instant.ofEpochMilli(c.fecha).atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(formato)
+            val quien = when (c.rol) {
+                "medico" -> "Tu médico"
+                "familiar" -> "Tu cuidador"
+                "paciente" -> "Tú"
+                else -> "Alguien"
+            } + (if (c.quien.isNotBlank() && c.rol != "paciente") " ${c.quien}" else "")
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(2.dp, Lavanda, RoundedCornerShape(18.dp))
+                    .semantics(mergeDescendants = true) {}
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("$fecha · $quien", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextoLavanda)
+                Text("Antes: ${c.antes}", fontSize = 17.sp, lineHeight = 23.sp, color = TextoSecundario)
+                Text("Ahora: ${c.despues}", fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, color = TextoNormal)
+            }
+        }
     }
 }
 

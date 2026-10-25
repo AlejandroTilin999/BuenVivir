@@ -1,7 +1,10 @@
 package com.utom.buenvivir.ui.components
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -23,6 +26,13 @@ class Lector(context: Context) {
             elegirVozNatural()
             tts.setSpeechRate(velocidad)
             tts.setPitch(1.05f)      // tono ligeramente más alto, más cálido
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(id: String?) {}
+                override fun onDone(id: String?) { terminar(id) }
+                @Deprecated("Deprecated in Java")
+                override fun onError(id: String?) { terminar(id) }
+                override fun onStop(id: String?, interrupted: Boolean) { terminar(id) }
+            })
             listo = true
             pendiente?.let { hablar(it) }
             pendiente = null
@@ -59,6 +69,31 @@ class Lector(context: Context) {
     }
 
     fun callar() { if (listo) tts.stop() }
+
+    // Lo que hay que hacer cuando termine de decir una frase (para el asistente de voz)
+    private val principal = Handler(Looper.getMainLooper())
+    private val despues = mutableMapOf<String, () -> Unit>()
+    private var contador = 0
+
+    private fun terminar(id: String?) {
+        val accion = synchronized(despues) { despues.remove(id) } ?: return
+        principal.post(accion)
+    }
+
+    /** Dice [texto] y, cuando termina de hablar, hace [luego] (por ejemplo, abrir el micrófono). */
+    fun decirYLuego(texto: String, luego: () -> Unit) {
+        if (!listo) { principal.postDelayed(luego, 300); return }
+        val id = "pregunta${contador++}"
+        synchronized(despues) { despues.clear(); despues[id] = luego }
+        tts.speak(texto, TextToSpeech.QUEUE_FLUSH, null, id)
+    }
+
+    /** Solo dice el texto (aunque ya esté hablando, lo reemplaza). */
+    fun decir(texto: String) {
+        if (!listo) { pendiente = texto; return }
+        synchronized(despues) { despues.clear() }
+        hablar(texto)
+    }
 
     private fun hablar(texto: String) {
         tts.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "buenvivir")

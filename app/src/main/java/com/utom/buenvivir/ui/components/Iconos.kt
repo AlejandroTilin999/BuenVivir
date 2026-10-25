@@ -42,6 +42,7 @@ object Iconos {
         "M18 13a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"
     )
     val Atras = icono("M15 6l-6 6l6 6", grosor = 2.6f)
+    val Microfono = icono("M9 6a3 3 0 0 1 6 0v5a3 3 0 0 1 -6 0z", "M5 11a7 7 0 0 0 14 0", "M12 18v3", grosor = 2.4f)
     val Mas = icono("M12 5v14", "M5 12h14", grosor = 2.8f)
     val Candado = icono(
         "M7 11h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2H7a2 2 0 0 1 -2 -2v-6a2 2 0 0 1 2 -2z",

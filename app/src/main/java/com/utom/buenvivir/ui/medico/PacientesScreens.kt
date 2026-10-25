@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.Busqueda
 import com.utom.buenvivir.data.MedicinaNube
+import com.utom.buenvivir.data.CambioDosis
 import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.Resultado
 import com.utom.buenvivir.data.SesionStore
@@ -85,10 +87,20 @@ data class Resumen(
 /** Desde qué día se piden las tomas: hoy y los 6 días anteriores. */
 fun desdeSemana(hoy: LocalDate = LocalDate.now()): LocalDate = hoy.minusDays(6)
 
-fun resumir(tomas: List<TomaNube>, hoy: LocalDate = LocalDate.now()): Resumen {
-    val semana = tomas.filter { !it.fecha.isBefore(desdeSemana(hoy)) && !it.fecha.isAfter(hoy) }
+/** Cuántos días de historial ve el médico en el detalle del paciente. */
+enum class Periodo(val etiqueta: String, val dias: Int) {
+    Semana("7 días", 7),
+    Mes("30 días", 30),
+    TresMeses("3 meses", 90);
+
+    fun desde(hoy: LocalDate): LocalDate = hoy.minusDays(dias - 1L)
+    val titulo get() = if (this == TresMeses) "Últimos 3 meses" else "Últimos $dias días"
+}
+
+fun resumir(tomas: List<TomaNube>, hoy: LocalDate = LocalDate.now(), periodo: Periodo = Periodo.Semana): Resumen {
+    val semana = tomas.filter { !it.fecha.isBefore(periodo.desde(hoy)) && !it.fecha.isAfter(hoy) }
     val porDia = semana.groupBy { it.fecha }
-    val dias = (6 downTo 0).map { atras ->
+    val dias = (periodo.dias - 1 downTo 0).map { atras ->
         val f = hoy.minusDays(atras.toLong())
         val del = porDia[f].orEmpty()
         DiaResumen(
@@ -108,7 +120,7 @@ fun resumir(tomas: List<TomaNube>, hoy: LocalDate = LocalDate.now()): Resumen {
         dias = dias,
         motivos = faltas.groupingBy { it.motivo ?: "Otro motivo" }.eachCount().toList().sortedByDescending { it.second },
         ultimaFalta = ordenadas.firstOrNull { !it.tomada },
-        recientes = ordenadas.take(8)
+        recientes = ordenadas
     )
 }
 
@@ -451,7 +463,8 @@ fun DetallePacienteScreen(
     LaunchedEffect(p.id, esCuidador) { if (!esCuidador) Vinculos.marcarComoSuMedico(p.id) }
     val cuidadorLibre = esCuidador && conMedico == false
     val hoy = LocalDate.now()
-    val estado by remember(p.id) { Vinculos.tomas(p.id, desdeSemana(hoy)) }
+    var periodo by rememberSaveable { mutableStateOf(Periodo.Semana) }
+    val estado by remember(p.id, periodo) { Vinculos.tomas(p.id, periodo.desde(hoy)) }
         .collectAsState(initial = TomasPaciente.Cargando)
     var confirmar by remember { mutableStateOf(false) }
 
@@ -480,15 +493,18 @@ fun DetallePacienteScreen(
             }
         }
 
+        if (estado !is TomasPaciente.SinPermiso) ElegirPeriodo(periodo) { periodo = it }
+
         when (val e = estado) {
             TomasPaciente.Cargando -> Cargando()
             TomasPaciente.SinPermiso ->
                 Aviso(AvisoMedico("${p.nombre} te quitó de su equipo, así que ya no puedes ver sus tomas.", esError = true))
             is TomasPaciente.Listas -> {
-                val r = resumir(e.tomas, hoy)
-                TarjetaSemana(r)
+                val r = resumir(e.tomas, hoy, periodo)
+                TarjetaSemana(r, periodo)
                 if (r.motivos.isNotEmpty()) Motivos(r.motivos)
-                if (r.recientes.isNotEmpty()) UltimasTomas(r.recientes, hoy)
+                if (r.recientes.isNotEmpty()) UltimasTomas(r.recientes, hoy, periodo)
+                else Text("No hay tomas registradas en este periodo.", fontSize = 17.sp, color = TextoSecundario)
             }
         }
 
@@ -572,8 +588,31 @@ fun DetallePacienteScreen(
     }
 }
 
+/** "7 días · 30 días · 3 meses": cuánto historial ver. */
 @Composable
-private fun TarjetaSemana(r: Resumen) {
+private fun ElegirPeriodo(elegido: Periodo, onElegir: (Periodo) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Periodo.entries.forEach { op ->
+            val si = op == elegido
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (si) AzulBoton else Blanco)
+                    .border(2.dp, if (si) AzulBoton else BordeTarjeta, RoundedCornerShape(24.dp))
+                    .clickable(role = Role.Tab) { onElegir(op) }
+                    .semantics { selected = si },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(op.etiqueta, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (si) Blanco else TextoChip)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TarjetaSemana(r: Resumen, periodo: Periodo = Periodo.Semana) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -583,7 +622,7 @@ private fun TarjetaSemana(r: Resumen) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            "Últimos 7 días",
+            periodo.titulo,
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
             color = TextoLavanda,
@@ -594,12 +633,22 @@ private fun TarjetaSemana(r: Resumen) {
             Text("tomadas", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TextoLavanda, modifier = Modifier.padding(bottom = 6.dp))
         }
         Barra(r.porcentaje, fondo = Blanco)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            r.dias.forEach { d -> CirculoDia(d) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Leyenda(Violeta, Iconos.Palomita, "Las tomó todas")
-            Leyenda(GrisAviso, Iconos.Tache, "Faltó una")
+        if (periodo == Periodo.Semana) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                r.dias.forEach { d -> CirculoDia(d) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Leyenda(Violeta, Iconos.Palomita, "Las tomó todas")
+                Leyenda(GrisAviso, Iconos.Tache, "Faltó una")
+            }
+        } else {
+            // En periodos largos, en vez de un círculo por día, cuántos días le faltó alguna
+            val conDatos = r.dias.count { it.estado != EstadoDia.SinDatos }
+            val conFalta = r.dias.count { it.estado == EstadoDia.Falto }
+            Text(
+                "Le faltó alguna pastilla $conFalta de $conDatos días con registro.",
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoLavanda
+            )
         }
     }
 }
@@ -687,10 +736,13 @@ private fun Motivos(motivos: List<Pair<String, Int>>) {
 }
 
 @Composable
-private fun UltimasTomas(tomas: List<TomaNube>, hoy: LocalDate) {
+private fun UltimasTomas(todas: List<TomaNube>, hoy: LocalDate, periodo: Periodo = Periodo.Semana) {
+    // Se ven 8; con "Ver todas" se ven las de todo el periodo
+    var verTodas by remember(periodo) { mutableStateOf(false) }
+    val tomas = if (verTodas) todas else todas.take(8)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Últimas tomas",
+            if (periodo == Periodo.Semana) "Últimas tomas" else "Tomas · ${periodo.titulo.lowercase()}",
             fontSize = 20.sp,
             fontWeight = FontWeight.ExtraBold,
             color = TextoNormal,
@@ -710,7 +762,7 @@ private fun UltimasTomas(tomas: List<TomaNube>, hoy: LocalDate) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("${diaTexto(t.fecha, hoy)} · ${horaTexto(t.minutos)}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoNormal)
+                    Text("${fechaCorta(t.fecha, hoy)} · ${horaTexto(t.minutos)}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoNormal)
                     if (t.tomada) {
                         if (t.registradaEn > 0) {
                             Text("A las ${horaDeRegistro(t.registradaEn)}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextoMoradoMedio)
@@ -722,8 +774,26 @@ private fun UltimasTomas(tomas: List<TomaNube>, hoy: LocalDate) {
                 if (t.tomada) Etiqueta("Tomada", Violeta, Blanco) else Etiqueta("No la tomó", GrisAviso, Blanco)
             }
         }
+        if (todas.size > 8) {
+            Text(
+                if (verTodas) "Ver menos" else "Ver todas (${todas.size})",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AzulBoton,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(role = Role.Button) { verTodas = !verTodas }
+                    .padding(vertical = 12.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
+
+/** "Hoy", "Ayer", "Lunes 20" en la última semana; más atrás, "12 de octubre". */
+private fun fechaCorta(fecha: LocalDate, hoy: LocalDate): String =
+    if (fecha.isBefore(hoy.minusDays(6))) fecha.format(FECHA_LARGA) else diaTexto(fecha, hoy)
 
 // ---------- Medicinas del paciente ----------
 
@@ -766,6 +836,7 @@ private fun Medicinas(
                             fontWeight = FontWeight.SemiBold,
                             color = TextoChip
                         )
+                        if (m.cambios.isNotEmpty()) CambiosDosis(m.cambios)
                     }
                     // Cambiar y Quitar: con los mismos permisos (el cuidador no toca lo que recetó el médico)
                     if (puedeQuitar(m)) Column(horizontalAlignment = Alignment.End) {
@@ -807,6 +878,42 @@ private fun Medicinas(
             Icon(Iconos.Mas, contentDescription = null, tint = Blanco, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text("Agregar medicina", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = Blanco)
+        }
+    }
+}
+
+/** "Cambios de dosis (2)": al tocarlo se ven, del más nuevo al más viejo. */
+@Composable
+private fun CambiosDosis(cambios: List<CambioDosis>) {
+    var abierto by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+        Text(
+            (if (abierto) "Ocultar cambios de dosis" else "Cambios de dosis (${cambios.size})"),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = AzulBoton,
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(role = Role.Button) { abierto = !abierto }
+                .padding(vertical = 6.dp)
+        )
+        if (abierto) cambios.sortedByDescending { it.fecha }.forEach { c ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(LavandaSuave)
+                    .semantics(mergeDescendants = true) {}
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    fechaDe(c.fecha) + (if (c.quien.isNotBlank()) " · ${c.quien}" else ""),
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextoLavanda
+                )
+                Text("Antes: ${c.antes}", fontSize = 14.sp, color = TextoSecundario)
+                Text("Ahora: ${c.despues}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextoNormal)
+            }
         }
     }
 }

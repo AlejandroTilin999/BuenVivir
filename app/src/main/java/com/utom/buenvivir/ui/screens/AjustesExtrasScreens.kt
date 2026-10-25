@@ -35,7 +35,7 @@ import com.utom.buenvivir.ui.theme.*
  */
 
 @Composable
-private fun PantallaAjuste(
+internal fun PantallaAjuste(
     titulo: String,
     onRegresar: () -> Unit,
     onEscuchar: () -> Unit,
@@ -73,7 +73,7 @@ private fun PantallaAjuste(
 
 /** Un bloque de texto con subtítulo dentro de un recuadro, para Privacidad, Ayuda y Acerca de. */
 @Composable
-private fun Bloque(subtitulo: String, texto: String) {
+internal fun Bloque(subtitulo: String, texto: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -91,7 +91,7 @@ private fun Bloque(subtitulo: String, texto: String) {
 
 /** Texto de explicación en un recuadro azul claro. */
 @Composable
-private fun Nota(texto: String) {
+internal fun Nota(texto: String) {
     Text(
         texto,
         fontSize = 18.sp,
@@ -194,20 +194,16 @@ fun MiMedicoScreen(
 // ---------- Privacidad ----------
 
 const val TEXTO_PRIVACIDAD =
-    "Qué se guarda. Tu nombre, tus medicinas, a qué hora te toca cada una, si te la tomaste y, si no, el motivo. " +
-        "Dónde se guarda. En tu celular y en Firebase, un servicio de Google donde la app guarda los datos para compartirlos. " +
-        "Quién lo ve. Solo tú y las personas que agregaste con tu código: tu médico y quienes te cuidan. Nadie más puede entrar. " +
-        "Cómo quitar a alguien. En Mi familia, toca Quitar junto a su nombre. Desde ese momento ya no ve tus datos. " +
-        "Para qué se usa. Solo para recordarte tus pastillas y para que tu médico y tu familia te ayuden. No se vende ni se usa para anuncios."
+    "Qué se guarda. Tus medicinas, tus horarios y si te las tomas. " +
+        "Quién lo ve. Solo tú y quienes agregues con tu código. Los quitas en Mi familia. " +
+        "Para qué. Para recordarte tus pastillas. No se vende ni se usa para anuncios."
 
 @Composable
 fun PrivacidadScreen(onRegresar: () -> Unit, onEscuchar: () -> Unit) {
     PantallaAjuste("Privacidad", onRegresar, onEscuchar) {
-        Bloque("Qué se guarda", "Tu nombre, tus medicinas, a qué hora te toca cada una, si te la tomaste y, si no, el motivo.")
-        Bloque("Dónde se guarda", "En tu celular y en Firebase, un servicio de Google donde la app guarda los datos para compartirlos.")
-        Bloque("Quién lo ve", "Solo tú y las personas que agregaste con tu código: tu médico y quienes te cuidan. Nadie más puede entrar.")
-        Bloque("Cómo quitar a alguien", "En Mi familia, toca \"Quitar\" junto a su nombre. Desde ese momento ya no ve tus datos.")
-        Bloque("Para qué se usa", "Solo para recordarte tus pastillas y para que tu médico y tu familia te ayuden. No se vende ni se usa para anuncios.")
+        Bloque("Qué se guarda", "Tus medicinas, tus horarios y si te las tomas.")
+        Bloque("Quién lo ve", "Solo tú y quienes agregues con tu código. Los quitas en Mi familia.")
+        Bloque("Para qué", "Para recordarte tus pastillas. No se vende ni se usa para anuncios.")
     }
 }
 
@@ -217,6 +213,7 @@ const val TEXTO_AYUDA =
     "Cuando suene la alarma, toca Ya me la tomé, o No me la tomé y elige por qué. " +
         "Si no respondes, la alarma vuelve a sonar dos veces más. " +
         "Tus medicinas te las agrega tu médico o quien te cuida. Para eso, dales tu código: Mi familia, Agregar a alguien. " +
+        "También puedes agregarlas tú en Mis medicinas, escribiendo o con tu voz. " +
         "En cada pantalla puedes tocar la bocina para que la app te lea lo que dice. " +
         "Si la alarma suena muy bajito, en Ajustes cambia el volumen a Alto."
 
@@ -224,7 +221,8 @@ const val TEXTO_AYUDA =
 fun AyudaScreen(onRegresar: () -> Unit, onEscuchar: () -> Unit) {
     PantallaAjuste("Ayuda", onRegresar, onEscuchar) {
         Bloque("Cuando suene la alarma", "Toca \"Ya me la tomé\", o \"No me la tomé\" y elige por qué. Si no respondes, vuelve a sonar dos veces más.")
-        Bloque("¿Cómo agrego mis medicinas?", "Te las agrega tu médico o quien te cuida. Dales tu código: Mi familia → Agregar a alguien.")
+        Bloque("¿Cómo agrego mis medicinas?", "Te las agrega tu médico o quien te cuida: dales tu código en Mi familia → Agregar a alguien. También puedes agregarlas tú en Mis medicinas, escribiendo o con tu voz.")
+        Bloque("Si cambio de celular", "En Ajustes → Respaldar mi cuenta, pon un correo y una contraseña. En el celular nuevo elige \"Ya usaba BuenVivir\" y escríbelos.")
         Bloque("Si no puedo leer bien", "Toca la bocina que hay en cada pantalla y la app te lee lo que dice.")
         Bloque("Si la alarma suena bajito", "En Ajustes, en Volumen, elige \"Alto\". También puedes cambiar el tono.")
     }

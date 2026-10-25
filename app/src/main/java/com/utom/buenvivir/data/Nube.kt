@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.android.gms.tasks.Task
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -127,6 +128,53 @@ object Nube {
     /** El id del paciente en Firebase (entra si hace falta). null si no hay internet la primera vez. */
     suspend fun miId(): String? = suspendCancellableCoroutine { c ->
         conUsuario(alFallar = { if (c.isActive) c.resume(null) }) { uid -> if (c.isActive) c.resume(uid) }
+    }
+
+    // ---------- Respaldo de la cuenta del paciente ----------
+
+    /** El correo con el que respaldó su cuenta, o null si todavía no la respalda. */
+    fun correoDeRespaldo(): String? = auth.currentUser?.email?.takeIf { it.isNotBlank() }
+
+    /**
+     * Respalda la cuenta anónima con un correo y una contraseña. El paciente sigue siendo el mismo
+     * (mismo id, mismas medicinas, mismo código y mismo historial); solo se le agrega cómo volver a entrar.
+     */
+    suspend fun respaldar(correo: String, contrasena: String): Resultado {
+        when {
+            correo.isBlank() -> return Resultado.Mal("Escribe un correo.")
+            contrasena.length < 8 -> return Resultado.Mal("La contraseña debe tener mínimo 8 caracteres.")
+        }
+        val uid = miId() ?: return Resultado.Mal("Revisa tu conexión a internet.")
+        val usuario = auth.currentUser?.takeIf { it.uid == uid } ?: return Resultado.Mal("No se pudo. Intenta otra vez.")
+        return try {
+            usuario.linkWithCredential(EmailAuthProvider.getCredential(correo.trim(), contrasena)).esperar()
+            Resultado.Bien
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo respaldar la cuenta", e)
+            Resultado.Mal(Cuenta.mensajeDe(e))
+        }
+    }
+
+    /**
+     * En un celular nuevo: entra con el correo y la contraseña del respaldo.
+     * Regresa el nombre del paciente si todo salió bien.
+     */
+    suspend fun recuperarPaciente(correo: String, contrasena: String): Pair<Resultado, String?> {
+        if (correo.isBlank() || contrasena.isBlank()) return Resultado.Mal("Escribe tu correo y tu contraseña.") to null
+        return try {
+            val uid = auth.signInWithEmailAndPassword(correo.trim(), contrasena).esperar().user!!.uid
+            // Que no sea una cuenta de médico o de cuidador
+            val rol = runCatching { db.collection("usuarios").document(uid).get().esperar().getString("rol") }.getOrNull()
+            val paciente = db.collection("pacientes").document(uid).get().esperar()
+            when {
+                rol != null -> { auth.signOut(); Resultado.Mal("Esa cuenta es de médico o de cuidador.") to null }
+                !paciente.exists() -> { auth.signOut(); Resultado.Mal("No encontramos un paciente con esa cuenta.") to null }
+                else -> Resultado.Bien to (paciente.getString("nombre") ?: "")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo recuperar la cuenta", e)
+            Resultado.Mal(Cuenta.mensajeDe(e)) to null
+        }
     }
 
     /** Sus medicinas en Firebase, en vivo (las que le puso su médico, su familia o él mismo). */

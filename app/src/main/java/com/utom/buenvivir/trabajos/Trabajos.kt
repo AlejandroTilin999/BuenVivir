@@ -25,6 +25,7 @@ import com.utom.buenvivir.MainActivity
 import com.utom.buenvivir.R
 import com.utom.buenvivir.alarmas.Programador
 import com.utom.buenvivir.data.AjustesStore
+import com.utom.buenvivir.data.MedicinaNube
 import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.RepositorioLocal
 import com.utom.buenvivir.data.SesionStore
@@ -79,6 +80,7 @@ class SincronizarPaciente(context: Context, params: WorkerParameters) : Coroutin
         return try {
             val docs = Recetas.coleccion(uid).get(Source.SERVER).esperar()
             val lista = docs.documents.mapNotNull(Recetas::leer)
+            AvisosDosis.revisar(ctx, lista)
             val repo = RepositorioLocal.get(ctx)
             if (repo.sincronizar(lista)) {
                 Programador.programarTodas(ctx)
@@ -111,6 +113,68 @@ class AvisarEquipo(context: Context, params: WorkerParameters) : CoroutineWorker
             Log.w("Trabajos", "No se pudieron revisar las tomas", e)
             Result.retry()
         }
+    }
+}
+
+/**
+ * Paciente: si su médico o su cuidador le cambiaron la dosis de una medicina, le avisa con una notificación
+ * ("Tu médico Dr. Pérez cambió tu dosis de Metformina"). Se llama al abrir la app y cada 15 minutos.
+ */
+object AvisosDosis {
+    private const val CANAL = "cambios_dosis"
+    private const val PREFS = "avisos_dosis"
+    private const val VISTO = "visto"
+    private const val INICIADO = "iniciado"
+
+    fun revisar(context: Context, lista: List<MedicinaNube>) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val visto = prefs.getLong(VISTO, 0L)
+        // La primera vez solo se marcan como vistos (para no avisar de cambios viejos)
+        val primeraVez = !prefs.getBoolean(INICIADO, false)
+        val cambios = lista.flatMap { m -> m.cambios.map { m to it } }
+        val nuevos = cambios.filter { (_, c) -> c.fecha > visto }
+        if (!primeraVez) {
+            nuevos.filter { (_, c) -> c.rol != SesionStore.PACIENTE }.forEach { (m, c) ->
+                val quien = when (c.rol) {
+                    SesionStore.MEDICO -> "Tu médico"
+                    SesionStore.FAMILIAR -> "Tu cuidador"
+                    else -> "Alguien"
+                } + (if (c.quien.isNotBlank()) " ${c.quien}" else "")
+                avisar(context, (m.id + c.fecha).hashCode(), "$quien cambió tu dosis de ${m.nombre}", "Ahora: ${c.despues}")
+            }
+        }
+        val maximo = (cambios.maxOfOrNull { it.second.fecha } ?: 0L).coerceAtLeast(visto)
+        prefs.edit().putLong(VISTO, maximo).putBoolean(INICIADO, true).apply()
+    }
+
+    private fun avisar(context: Context, id: Int, titulo: String, texto: String) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) return
+        val nm = context.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CANAL) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(CANAL, "Cambios en tu dosis", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Te avisa cuando tu médico o tu cuidador cambian la dosis de una medicina"
+                }
+            )
+        }
+        val abrir = PendingIntent.getActivity(
+            context, 1,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val n = NotificationCompat.Builder(context, CANAL)
+            .setSmallIcon(R.drawable.ic_pastilla)
+            .setColor(0xFF004EE0.toInt())
+            .setContentTitle(titulo)
+            .setContentText(texto)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(texto))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(abrir)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(id, n)
     }
 }
 

@@ -50,6 +50,7 @@ fun AjustesScreen(
     mostrarDemo: Boolean = true,      // "Para la demostración" solo en el celular de la feria
     puedeProbar: Boolean = true,      // sin medicinas no hay qué probar
     onAbrirOpcion: (String) -> Unit = {},
+    respaldada: Boolean = false,
     onIrMedicinas: () -> Unit = {},
     onIrFamilia: () -> Unit = {}
 ) {
@@ -197,6 +198,7 @@ fun AjustesScreen(
                     val opciones = listOf(
                         "Mi perfil" to nombre,
                         "Mi médico" to "",
+                        "Respaldar mi cuenta" to if (respaldada) "Hecho" else "",
                         "Quién usa este celular" to "Paciente",
                         "Privacidad" to "",
                         "Ayuda" to "",

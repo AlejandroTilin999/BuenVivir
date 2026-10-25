@@ -7,9 +7,19 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.Date
 
 /** Una hora en que toca la medicina. [clave] la identifica aunque cambie la hora ("h0", "h1"...). */
 data class HorarioNube(val clave: String, val minutos: Int, val indicacion: String)
+
+/** Un cambio de dosis: qué tenía antes, qué tiene ahora, cuándo y quién lo cambió. */
+data class CambioDosis(
+    val fecha: Long,
+    val antes: String,
+    val despues: String,
+    val quien: String,
+    val rol: String = ""      // "medico", "familiar" o "paciente": quién lo cambió
+)
 
 /**
  * Una medicina del paciente como se guarda en Firebase. La puede agregar su médico,
@@ -25,7 +35,8 @@ data class MedicinaNube(
     val indicacion: String,
     val horarios: List<HorarioNube>,
     val agregadaPor: String = "",
-    val quien: String = ""
+    val quien: String = "",
+    val cambios: List<CambioDosis> = emptyList()   // historial de cambios de dosis (el más nuevo al final)
 )
 
 /** Leer y escribir las medicinas de un paciente en Firebase (lo usan el médico y el paciente). */
@@ -49,8 +60,33 @@ object Recetas {
         },
         "agregadaPor" to m.agregadaPor,
         "quien" to m.quien,
+        "cambios" to m.cambios.takeLast(MAX_CAMBIOS).map {
+            mapOf(
+                "fecha" to Timestamp(Date(it.fecha)), "antes" to it.antes, "despues" to it.despues,
+                "quien" to it.quien, "rol" to it.rol
+            )
+        },
         "actualizada" to Timestamp.now()
     )
+
+    private const val MAX_CAMBIOS = 20
+
+    /** "1 tableta de 850 mg después de comer · 8:00 a. m. · 8:00 p. m." */
+    fun dosisTexto(m: MedicinaNube): String =
+        "${m.cantidad} ${m.indicacion} · " + m.horarios.joinToString(" · ") { horaTexto(it.minutos) }
+
+    /**
+     * Al guardar una medicina que ya existía: si cambió la dosis, la cantidad o las horas,
+     * se agrega al historial para que el médico vea cómo ha cambiado.
+     */
+    fun conCambio(anterior: MedicinaNube?, nueva: MedicinaNube): MedicinaNube {
+        if (anterior == null) return nueva.copy(cambios = emptyList())
+        val antes = dosisTexto(anterior)
+        val despues = dosisTexto(nueva)
+        val cambios = if (antes == despues) anterior.cambios
+        else anterior.cambios + CambioDosis(System.currentTimeMillis(), antes, despues, nueva.quien, nueva.agregadaPor)
+        return nueva.copy(cambios = cambios)
+    }
 
     fun leer(doc: DocumentSnapshot): MedicinaNube? {
         val nombre = doc.getString("nombre") ?: return null
@@ -71,7 +107,17 @@ object Recetas {
             indicacion = doc.getString("indicacion") ?: "",
             horarios = horarios.sortedBy { it.minutos },
             agregadaPor = doc.getString("agregadaPor") ?: "",
-            quien = doc.getString("quien") ?: ""
+            quien = doc.getString("quien") ?: "",
+            cambios = (doc.get("cambios") as? List<*>).orEmpty().mapNotNull { c ->
+                val mapa = c as? Map<*, *> ?: return@mapNotNull null
+                CambioDosis(
+                    fecha = (mapa["fecha"] as? Timestamp)?.toDate()?.time ?: 0L,
+                    antes = mapa["antes"] as? String ?: "",
+                    despues = mapa["despues"] as? String ?: "",
+                    quien = mapa["quien"] as? String ?: "",
+                    rol = mapa["rol"] as? String ?: ""
+                )
+            }
         )
     }
 
