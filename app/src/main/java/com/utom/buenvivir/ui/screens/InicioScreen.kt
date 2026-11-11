@@ -59,6 +59,8 @@ fun InicioScreen(
     horaTomada: String? = null,
     siguientes: List<ProximaToma> = listOf(siguiente),   // todas las que vienen, en orden de hora
     atrasada: Boolean = false,                           // ya pasó su hora y no la ha registrado
+    manana: Boolean = false,                             // hoy ya no le toca nada: la de arriba es de mañana
+    registrarDesde: String? = null,                      // si no es null, todavía no puede marcarla (falta mucho)
     onEscuchar: () -> Unit = {},
     onTomar: () -> Unit = {},
     onNoTomada: () -> Unit = {},
@@ -80,7 +82,7 @@ fun InicioScreen(
                 .padding(horizontal = 20.dp, vertical = 22.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            TarjetaToma(toma, estado, horaTomada, atrasada, onEscuchar, onTomar, onNoTomada)
+            TarjetaToma(toma, estado, horaTomada, atrasada, manana, registrarDesde, onEscuchar, onTomar, onNoTomada)
             // Las que siguen se ven siempre, aunque la de arriba siga pendiente
             if (siguientes.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -150,12 +152,13 @@ private fun Encabezado(nombre: String, tomadas: Int, total: Int, onAjustes: () -
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "Hoy: $tomadas de $total pastillas tomadas",
+                if (total == 0) "Hoy ya no te toca ninguna pastilla"
+                else "Hoy: $tomadas de $total pastillas tomadas",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextoGris
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (total > 0) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(total) { i ->
                     Box(
                         modifier = Modifier
@@ -184,6 +187,8 @@ private fun TarjetaToma(
     estado: EstadoToma,
     horaTomada: String?,
     atrasada: Boolean,
+    manana: Boolean,
+    registrarDesde: String?,
     onEscuchar: () -> Unit,
     onTomar: () -> Unit,
     onNoTomada: () -> Unit
@@ -201,6 +206,7 @@ private fun TarjetaToma(
         is EstadoToma.Omitida -> Triple(ChipApagado, TextoApagado, Iconos.Menos)
     }
     val etiquetaHora = when {
+        manana -> "Mañana · ${toma.hora}"
         estado != EstadoToma.Pendiente -> "Hoy · ${toma.hora}"
         atrasada -> "Pendiente · ${toma.hora}"
         else -> "Ahora · ${toma.hora}"
@@ -260,7 +266,29 @@ private fun TarjetaToma(
                     lineHeight = 27.sp,
                     color = TextoNormal
                 )
-                Column {
+                // Solo se puede marcar desde 5 minutos antes de su hora
+                if (registrarDesde != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 10.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(LavandaChip)
+                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Iconos.Reloj, contentDescription = null, tint = TextoChip, modifier = Modifier.size(24.dp))
+                        Text(
+                            if (manana) "Podrás marcarla mañana desde las $registrarDesde"
+                            else "Podrás marcarla desde las $registrarDesde",
+                            fontSize = 18.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextoChip
+                        )
+                    }
+                } else Column {
                     Button(
                         onClick = onTomar,
                         modifier = Modifier

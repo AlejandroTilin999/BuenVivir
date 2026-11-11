@@ -361,6 +361,7 @@ fun PacienteApp(
             aviso = errorMed?.let { AvisoMedico(it, esError = true) },
             onRegresar = { errorMed = null; pestana = if (editando != null) 3 else 1 },
             inicial = editando,
+            existentes = misNube.orEmpty(),
             onGuardar = { m ->
                 guardarMedicina(m) {
                     pestana = if (editando != null) 3 else 1
@@ -473,8 +474,8 @@ fun PacienteApp(
     }
 
     fun registrar(tomada: Boolean, motivo: String?) {
-        val esPrueba = ModoPrueba.activa(context, p.horario.id, p.hoy)
-        scope.launch { repo.registrar(p.horario, p.hoy, tomada, motivo) }
+        val esPrueba = ModoPrueba.activa(context, p.horario.id, p.fechaToma)
+        scope.launch { repo.registrar(p.horario, p.fechaToma, tomada, motivo) }
         // Ya respondió: se quita la notificación y deja de repetirse
         Notificaciones.quitar(context, p.horario.id)
         Programador.cancelarRepeticion(context, p.horario.id)
@@ -558,7 +559,7 @@ fun PacienteApp(
                     onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
                     respaldada = correoRespaldo != null,
                 onProbarRecordatorio = {
-                    PruebaRapida.programar(context, p.horario.id, p.hoy)
+                    PruebaRapida.programar(context, p.horario.id, p.fechaToma)
                     avisar("Sonará en ${PruebaRapida.SEGUNDOS} segundos")
                 },
                 mostrarDemo = RepositorioLocal.MOSTRAR_REINICIAR,
@@ -580,6 +581,8 @@ fun PacienteApp(
                 siguiente = p.siguiente,
                 siguientes = p.siguientes,
                 atrasada = p.atrasada,
+                manana = p.manana,
+                registrarDesde = p.registrarDesde,
                 onEscuchar = { lector.leer(textoInicio(p, nombre)) },
                 onTomar = { registrar(tomada = true, motivo = null) },
                 onNoTomada = { mostrarMotivo = true },

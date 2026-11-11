@@ -183,7 +183,10 @@ private fun PantallasMedico(onSalir: () -> Unit) {
     // Con el nombre al día, por si el paciente lo cambió mientras estaba abierto
     abierto?.let { a -> pacientes?.firstOrNull { it.id == a.id } ?: a }?.let { p ->
         if (recetando) {
+            // Las que ya tiene, para no recetarle la misma dos veces
+            val existentes by remember(p.id) { Recetas.escuchar(p.id) }.collectAsState(initial = null)
             RecetaScreen(
+                existentes = existentes.orEmpty(),
                 paciente = p.nombre,
                 medico = perfil?.nombre ?: "",
                 rol = perfil?.rol ?: SesionStore.MEDICO,

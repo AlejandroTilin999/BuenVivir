@@ -73,7 +73,8 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
             dao.actualizarMedicina(m.copy(nubeId = id))
             // Sin internet Firebase la guarda y la sube después
             Recetas.coleccion(uid).document(id).set(
-                Recetas.datos(MedicinaNube(id, m.nombre, m.para, m.cantidad, m.indicacion, horarios, agregadaPor = SesionStore.PACIENTE))
+                Recetas.datos(MedicinaNube(id, m.nombre, m.para, m.cantidad, m.indicacion, horarios, agregadaPor = SesionStore.PACIENTE,
+                    creadaEn = m.creadaEn, inicio = m.inicio, dias = m.dias))
             )
         }
     }
@@ -95,11 +96,13 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
                 dao.insertarMedicina(
                     MedicinaEntity(
                         nombre = m.nombre, para = m.para, cantidad = m.cantidad, indicacion = m.indicacion,
-                        video = "¿Para qué sirve la ${m.nombre.lowercase()}?", nubeId = m.id
+                        video = "¿Para qué sirve la ${m.nombre.lowercase()}?", nubeId = m.id,
+                        creadaEn = m.creadaEn, inicio = m.inicio, dias = m.dias
                     )
                 )
             } else {
-                val nueva = local.copy(nombre = m.nombre, para = m.para, cantidad = m.cantidad, indicacion = m.indicacion)
+                val nueva = local.copy(nombre = m.nombre, para = m.para, cantidad = m.cantidad, indicacion = m.indicacion,
+                    creadaEn = m.creadaEn, inicio = m.inicio, dias = m.dias)
                 if (nueva != local) { dao.actualizarMedicina(nueva); cambio = true }
                 local.id
             }
@@ -133,7 +136,8 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
     /** true si este celular ya se usó como paciente (tiene medicinas guardadas). */
     suspend fun tieneDatos() = dao.contarMedicinas() > 0
 
-    suspend fun horarios() = dao.horarios()
+    /** Los horarios de las medicinas que siguen vigentes hoy (las terminadas ya no suenan). */
+    suspend fun horarios() = dao.horariosVigentes(LocalDate.now().toString())
     suspend fun horario(id: Long) = dao.horario(id)
     suspend fun medicina(id: Long) = dao.medicina(id)
     suspend fun toma(horarioId: Long, fecha: LocalDate) = dao.toma(horarioId, fecha.toString())

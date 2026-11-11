@@ -44,6 +44,15 @@ interface BuenVivirDao {
     @Query("SELECT * FROM horarios ORDER BY minutos")
     suspend fun horarios(): List<HorarioEntity>
 
+    /** Solo los horarios de las medicinas que no han terminado (para las alarmas y el reloj). */
+    @Query(
+        "SELECT horarios.* FROM horarios INNER JOIN medicinas ON medicinas.id = horarios.medicinaId " +
+        "WHERE medicinas.dias <= 0 OR medicinas.inicio = '' " +
+        "OR date(medicinas.inicio, '+' || (medicinas.dias - 1) || ' days') >= :hoy " +
+        "ORDER BY horarios.minutos"
+    )
+    suspend fun horariosVigentes(hoy: String): List<HorarioEntity>
+
     @Query("SELECT * FROM horarios WHERE id = :id")
     suspend fun horario(id: Long): HorarioEntity?
 

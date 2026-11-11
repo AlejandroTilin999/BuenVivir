@@ -57,6 +57,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
+    // Leer recetas con Gemini (Firebase AI Logic)
+    implementation(libs.firebase.ai)
     // Comunicación con la app del reloj (Wear OS)
     implementation(libs.play.services.wearable)
     // Trabajos en segundo plano: revisar medicinas y avisar al médico/cuidador aunque la app esté cerrada

@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import com.utom.buenvivir.data.AjustesStore
 import com.utom.buenvivir.data.RepositorioLocal
+import com.utom.buenvivir.data.terminada
+import com.utom.buenvivir.data.tocaEn
 import com.utom.buenvivir.reloj.Reloj
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,18 +37,23 @@ class AlarmaReceiver : BroadcastReceiver() {
 
         val repo = RepositorioLocal.get(ctx)
         val h = repo.horario(horarioId) ?: return@enSegundoPlano
+        val med = repo.medicina(h.medicinaId) ?: return@enSegundoPlano
+
+        // La medicina ya terminó (por ejemplo, era por 7 días): no avisa ni vuelve a programar
+        if (!prueba && med.terminada(fecha)) return@enSegundoPlano
+        // Ese día todavía no le tocaba (la agregó después de esa hora)
+        val toca = prueba || med.tocaEn(fecha, h.minutos)
 
         // Aviso 20 minutos antes: solo si todavía no respondió esa pastilla, y deja listo el de mañana
         if (intent.getBooleanExtra(PreAvisos.EXTRA, false)) {
-            if (repo.toma(horarioId, fecha) == null) {
-                repo.medicina(h.medicinaId)?.let { PreAvisos.mostrar(ctx, h, it) }
-            }
+            if (toca && repo.toma(horarioId, fecha) == null) PreAvisos.mostrar(ctx, h, med)
             PreAvisos.programarPara(ctx, h, fecha.plusDays(1))
             return@enSegundoPlano
         }
 
         // La alarma normal deja programada la de mañana
         if (!prueba && intento == 0) Programador.programarPara(ctx, h, fecha.plusDays(1))
+        if (!toca) return@enSegundoPlano
 
         // Si ya respondió, no molesta (la prueba siempre suena)
         if (!prueba && repo.toma(horarioId, fecha) != null) return@enSegundoPlano

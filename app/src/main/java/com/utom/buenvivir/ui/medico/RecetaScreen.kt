@@ -46,12 +46,24 @@ import com.utom.buenvivir.data.MedicinaNube
 import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.SesionStore
 import com.utom.buenvivir.data.horaTexto
+import com.utom.buenvivir.data.inicioPara
+import com.utom.buenvivir.data.LectorReceta
+import com.utom.buenvivir.data.Lectura
+import com.utom.buenvivir.data.MedicinaLeida
+import android.net.Uri
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.core.content.FileProvider
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import java.io.File
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.theme.*
 
 private val CANTIDADES_TABLETA = listOf("½ tableta", "1 tableta", "2 tabletas")
 private const val OTRA = "Otra"
 private val MOMENTOS = listOf("antes de comer", "con la comida", "después de comer")
+private const val SIEMPRE = "Siempre"
+private val DURACIONES = listOf(SIEMPRE, "7 días", "15 días", "30 días")
 
 /**
  * M7 · Agregar medicina. El médico elige la medicina del catálogo (o la escribe),
@@ -67,6 +79,7 @@ fun RecetaScreen(
     aviso: AvisoMedico?,
     onRegresar: () -> Unit,
     inicial: MedicinaNube? = null,          // si viene, es para cambiar esa medicina
+    existentes: List<MedicinaNube> = emptyList(),   // las que ya tiene, para no agregar la misma dos veces
     onGuardar: (MedicinaNube) -> Unit
 ) {
     // Al cambiar una medicina, todo empieza con lo que ya tenía
@@ -81,6 +94,14 @@ fun RecetaScreen(
     var otraCantidad by remember { mutableStateOf(ini.otraCantidad) }
     var momento by remember { mutableStateOf(ini.momento) }
     var horarios by remember { mutableStateOf(ini.horarios) }
+    var duracion by remember { mutableStateOf(ini.duracion) }       // "Siempre", "7 días"... u "Otra"
+    var otrosDias by remember { mutableStateOf(ini.otrosDias) }
+    // Escanear receta con la cámara (Gemini)
+    var eligiendoFoto by remember { mutableStateOf(false) }
+    var leyendo by remember { mutableStateOf(false) }
+    var leidas by remember { mutableStateOf<List<MedicinaLeida>>(emptyList()) }   // varias: elige cuál llenar
+    var notaEscaneo by remember { mutableStateOf<String?>(null) }
+    var porReemplazar by remember { mutableStateOf<MedicinaNube?>(null) }   // ya la tenía: ¿reemplazarla?
     var eligiendoHora by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -104,28 +125,131 @@ fun RecetaScreen(
         otraCantidad = ""
     }
 
-    fun guardar() {
+    /** Si ya tiene esa medicina, ¿quién la puede reemplazar? El médico, todas; los demás, no las del médico. */
+    fun puedeReemplazar(m: MedicinaNube): Boolean = when (rol) {
+        SesionStore.MEDICO -> true
+        SesionStore.PACIENTE -> m.agregadaPor == SesionStore.PACIENTE
+        else -> m.agregadaPor != SesionStore.MEDICO
+    }
+
+    fun guardar(reemplazar: MedicinaNube? = null) {
         error = when {
             nombre.isEmpty() -> "Elige o escribe la medicina."
             cuanto.isEmpty() -> "Indica cuánto toma cada vez."
             momento == null -> "Indica si es antes, con o después de comer."
             horarios.isEmpty() -> "Agrega al menos una hora."
+            duracion == null -> "Indica por cuánto tiempo la toma."
+            duracion == OTRA && (otrosDias.toIntOrNull() ?: 0) <= 0 -> "Escribe cuántos días la toma."
             else -> null
         }
         if (error != null) return
+        // ¿Ya tiene esa medicina? Así no se agrega dos veces (por ejemplo, al escanear la misma receta)
+        if (inicial == null && reemplazar == null) {
+            val repetida = existentes.firstOrNull { it.nombre.trim().equals(nombre.trim(), ignoreCase = true) }
+            if (repetida != null) {
+                if (puedeReemplazar(repetida)) porReemplazar = repetida
+                else error = "Ya tienes $nombre: la agregó tu médico. Si cambió la receta, pídele que la actualice."
+                return
+            }
+        }
+        val anterior = inicial ?: reemplazar
         val cuando = momento!!
+        val horas = horarios.sorted()
+        val dias = when (duracion) {
+            SIEMPRE -> 0
+            OTRA -> otrosDias.toInt()
+            else -> duracion!!.substringBefore(" ").toInt()
+        }
+        // Medicina nueva: empieza hoy (o mañana si ya pasaron sus horas). Las de antes conservan sus fechas;
+        // si se reemplaza con una receta nueva que es por unos días, los días se cuentan desde hoy.
+        val creadaEn = anterior?.creadaEn ?: System.currentTimeMillis()
+        val inicio = when {
+            anterior == null -> inicioPara(horas)
+            reemplazar != null && dias > 0 -> inicioPara(horas)
+            anterior.inicio.isEmpty() && dias > 0 -> inicioPara(horas)
+            else -> anterior.inicio
+        }
         onGuardar(
-            Recetas.conCambio(inicial, MedicinaNube(
-                id = inicial?.id ?: Recetas.nuevoId(),
+            Recetas.conCambio(anterior, MedicinaNube(
+                id = anterior?.id ?: Recetas.nuevoId(),
                 nombre = nombre,
                 para = para.trim(),
                 cantidad = cantidadCompleta,
                 indicacion = cuando,
-                horarios = horarios.sorted().mapIndexed { i, m -> HorarioNube("h$i", m, cuando) },
+                horarios = horas.mapIndexed { i, m -> HorarioNube("h$i", m, cuando) },
                 agregadaPor = rol,
-                quien = medico
+                quien = medico,
+                creadaEn = creadaEn,
+                inicio = inicio,
+                dias = dias
             ))
         )
+    }
+
+    // ---------- Escanear receta ----------
+    // Llena el formulario con lo que leyó Gemini. Nada se guarda solo: la persona revisa y toca Guardar.
+    fun llenar(l: MedicinaLeida) {
+        val cat = CatalogoMedicinas.lista.firstOrNull { it.nombre.equals(l.nombre, ignoreCase = true) }
+        if (cat != null) {
+            elegir(cat)
+            presentacion = cat.presentaciones.firstOrNull { it.equals(l.presentacion, ignoreCase = true) }
+                ?: cat.presentaciones.singleOrNull()
+            when {
+                cat.forma == Forma.INYECCION -> otraCantidad = l.cantidad.filter(Char::isDigit)
+                l.cantidad in CANTIDADES_TABLETA -> cantidad = l.cantidad
+                l.cantidad.isNotEmpty() -> { cantidad = OTRA; otraCantidad = l.cantidad }
+            }
+        } else {
+            elegida = null
+            aMano = true
+            busqueda = l.nombre
+            para = l.para
+            presentacion = null
+            cantidad = null
+            otraCantidad = listOf(l.cantidad, l.presentacion).filter { it.isNotEmpty() }.joinToString(" de ")
+        }
+        momento = l.momento.takeIf { it in MOMENTOS }
+        horarios = l.horas
+        if (l.dias > 0) {
+            val enLista = DURACIONES.firstOrNull { it.substringBefore(" ") == l.dias.toString() }
+            duracion = enLista ?: OTRA
+            otrosDias = if (enLista == null) l.dias.toString() else ""
+        }
+        error = null
+        notaEscaneo = "Listo, revisa que todo esté bien antes de guardar."
+    }
+
+    val contexto = LocalContext.current
+    val alcance = rememberCoroutineScope()
+    var fotoCamara by remember { mutableStateOf<Uri?>(null) }
+
+    fun leerFoto(uri: Uri) {
+        leyendo = true
+        notaEscaneo = null
+        alcance.launch {
+            when (val r = LectorReceta.leer(contexto, uri)) {
+                is Lectura.Bien -> if (r.medicinas.size == 1) llenar(r.medicinas.first()) else leidas = r.medicinas
+                is Lectura.Mal -> error = r.mensaje
+            }
+            leyendo = false
+        }
+    }
+    val camara = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { tomada ->
+        val uri = fotoCamara
+        if (tomada && uri != null) leerFoto(uri)
+    }
+    val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) leerFoto(uri)
+    }
+    fun abrirCamara() {
+        val carpeta = File(contexto.cacheDir, "recetas").apply { mkdirs() }
+        val uri = FileProvider.getUriForFile(contexto, "${contexto.packageName}.archivos", File(carpeta, "receta.jpg"))
+        fotoCamara = uri
+        try {
+            camara.launch(uri)
+        } catch (_: ActivityNotFoundException) {
+            error = "Este celular no tiene cámara. Elige la foto de la galería."
+        }
     }
 
     // ---------- Asistente de voz (solo el paciente) ----------
@@ -255,6 +379,13 @@ fun RecetaScreen(
                 else "Le llega a $paciente en cuanto la guardes.",
                 fontSize = 17.sp, lineHeight = 24.sp, color = TextoSecundario
             )
+        }
+
+        if (inicial == null) {
+            BotonEscanear(leyendo = leyendo, onClick = { if (!leyendo) eligiendoFoto = true })
+            notaEscaneo?.let {
+                Text(it, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = TextoChip)
+            }
         }
 
         if (esPaciente && inicial == null) {
@@ -434,6 +565,18 @@ fun RecetaScreen(
                 }
             }
 
+            // ---- Por cuánto tiempo ----
+            Opciones("¿Por cuánto tiempo?", DURACIONES + OTRA, duracion) { duracion = it }
+            if (duracion == OTRA) {
+                Campo(
+                    etiqueta = "¿Cuántos días?",
+                    valor = otrosDias,
+                    onCambio = { t -> otrosDias = t.filter(Char::isDigit).take(3) },
+                    teclado = KeyboardType.Number,
+                    ayuda = "Después de esos días ya no sonará."
+                )
+            }
+
             // ---- Así lo verá el paciente ----
             if (cuanto.isNotEmpty() && momento != null) {
                 Column(
@@ -470,7 +613,7 @@ fun RecetaScreen(
                 esPaciente -> "Guardar"
                 else -> "Guardar y enviar"
             },
-            ocupado = ocupado, onClick = ::guardar
+            ocupado = ocupado, onClick = { guardar() }
         )
     }
 
@@ -480,6 +623,92 @@ fun RecetaScreen(
             onListo = { m ->
                 eligiendoHora = false
                 if (m !in horarios) horarios = horarios + m
+            }
+        )
+    }
+
+    // Ya tenía esa medicina: reemplazarla con lo nuevo (no se agrega otra igual)
+    porReemplazar?.let { r ->
+        AlertDialog(
+            onDismissRequest = { porReemplazar = null },
+            title = { Text("Ya tienes ${r.nombre}", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Text(
+                    "Ahora la tomas: ${Recetas.dosisTexto(r)}\n\n¿Quieres cambiarla por lo que acabas de llenar?",
+                    fontSize = 17.sp, lineHeight = 24.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { porReemplazar = null; guardar(reemplazar = r) }) {
+                    Text("Sí, cambiarla", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { porReemplazar = null }) {
+                    Text("Cancelar", fontSize = 17.sp, color = TextoGris)
+                }
+            }
+        )
+    }
+
+    // De dónde sale la foto de la receta
+    if (eligiendoFoto) {
+        AlertDialog(
+            onDismissRequest = { eligiendoFoto = false },
+            title = { Text("Escanear receta", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Text(
+                    "Toma la foto de frente, con buena luz y que se lea toda la receta.",
+                    fontSize = 17.sp, lineHeight = 24.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { eligiendoFoto = false; abrirCamara() }) {
+                    Text("Tomar foto", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    eligiendoFoto = false
+                    galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) {
+                    Text("Elegir de la galería", fontSize = 17.sp, color = TextoGris)
+                }
+            }
+        )
+    }
+
+    // La receta trae varias medicinas: elige cuál llenar (las demás se agregan después, escaneando otra vez)
+    if (leidas.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { leidas = emptyList() },
+            title = { Text("Encontré ${leidas.size} medicinas", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Elige cuál quieres agregar ahora. Después puedes escanear otra vez para la siguiente.",
+                        fontSize = 16.sp, lineHeight = 22.sp, color = TextoSecundario)
+                    leidas.forEach { l ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Lavanda)
+                                .clickable(role = Role.Button) { leidas = emptyList(); llenar(l) }
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                listOf(l.nombre, l.presentacion).filter { it.isNotEmpty() }.joinToString(" "),
+                                fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal
+                            )
+                            if (l.horas.isNotEmpty()) {
+                                Text(l.horas.joinToString(" · ") { horaTexto(it) }, fontSize = 15.sp, color = TextoSecundario)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { leidas = emptyList() }) { Text("Cancelar", fontSize = 17.sp, color = TextoGris) }
             }
         )
     }
@@ -496,6 +725,38 @@ private fun preguntaDe(p: PasoVoz): String = when (p) {
     PasoVoz.Hora -> "¿A qué hora la tomas? Por ejemplo: a las 8 de la mañana."
     PasoVoz.OtraHora -> "¿La tomas a otra hora más? Di sí o no."
     PasoVoz.Listo -> ""
+}
+
+/** Botón para llenar la medicina con la foto de la receta. */
+@Composable
+private fun BotonEscanear(leyendo: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .border(2.dp, AzulBoton, RoundedCornerShape(22.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(26.dp)).background(Lavanda),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Iconos.Camara, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(30.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                if (leyendo) "Leyendo la receta…" else "Escanear receta",
+                fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoOscuro
+            )
+            Text(
+                if (leyendo) "Espera unos segundos." else "Toma una foto y se llena sola.",
+                fontSize = 16.sp, color = TextoLavanda
+            )
+        }
+    }
 }
 
 /** Botón grande para llenar la medicina hablando. */
@@ -541,7 +802,9 @@ private class ValoresIniciales(
     val cantidad: String? = null,
     val otraCantidad: String = "",
     val momento: String? = null,
-    val horarios: List<Int> = emptyList()
+    val horarios: List<Int> = emptyList(),
+    val duracion: String? = null,
+    val otrosDias: String = ""
 )
 
 private fun valoresIniciales(m: MedicinaNube?): ValoresIniciales {
@@ -553,7 +816,7 @@ private fun valoresIniciales(m: MedicinaNube?): ValoresIniciales {
     val partes = m.cantidad.split(" de ", limit = 2)
     val presentacion = partes.getOrNull(1)?.takeIf { p -> cat?.presentaciones?.contains(p) == true }
     val cuanto = if (presentacion != null) partes[0] else m.cantidad
-    return when {
+    val base = when {
         cat == null -> ValoresIniciales(m.nombre, null, true, m.para, null, null, m.cantidad, momento, horas)
         cat.forma == Forma.INYECCION ->
             ValoresIniciales(m.nombre, cat, false, m.para, presentacion ?: cat.presentaciones.singleOrNull(), null, cuanto.removeSuffix(" unidades"), momento, horas)
@@ -562,6 +825,15 @@ private fun valoresIniciales(m: MedicinaNube?): ValoresIniciales {
         else ->
             ValoresIniciales(m.nombre, cat, false, m.para, presentacion ?: cat.presentaciones.singleOrNull(), OTRA, cuanto, momento, horas)
     }
+    // Lo que ya tenía de duración: las medicinas de antes son para siempre
+    val enLista = DURACIONES.firstOrNull { it.substringBefore(" ") == m.dias.toString() }
+    val (duracion, otros) = when {
+        m.dias <= 0 -> SIEMPRE to ""
+        enLista != null -> enLista to ""
+        else -> OTRA to m.dias.toString()
+    }
+    return ValoresIniciales(base.busqueda, base.elegida, base.aMano, base.para, base.presentacion,
+        base.cantidad, base.otraCantidad, base.momento, base.horarios, duracion, otros)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

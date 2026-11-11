@@ -15,6 +15,9 @@ import com.utom.buenvivir.data.frecuenciaTexto
 import com.utom.buenvivir.data.horaDeRegistro
 import com.utom.buenvivir.data.horaTexto
 import com.utom.buenvivir.data.nombreDia
+import com.utom.buenvivir.data.hastaTexto
+import com.utom.buenvivir.data.tocaEn
+import com.utom.buenvivir.data.ultimoDia
 import com.utom.buenvivir.ui.screens.EstadoToma
 import com.utom.buenvivir.ui.screens.TomaDelDia
 import java.time.LocalDate
@@ -22,6 +25,9 @@ import java.time.LocalDateTime
 
 /** Minutos antes de la hora en que la pastilla ya aparece como "Ahora". */
 private const val MARGEN_MINUTOS = 30
+
+/** Minutos antes de la hora en que ya puede marcar "Tomar pastilla" o "No me la tomé". */
+private const val MINUTOS_PARA_REGISTRAR = 5
 
 /** Todo lo que muestran las pantallas, calculado con lo que hay en la base de datos. */
 data class Panorama(
@@ -33,6 +39,9 @@ data class Panorama(
     val siguiente: ProximaToma,
     val siguientes: List<ProximaToma>,   // las que vienen después, en orden de hora (en círculo)
     val atrasada: Boolean,               // la toma de Inicio ya pasó hace más de 30 min y no se registra
+    val fechaToma: LocalDate,            // el día de la toma de Inicio (hoy, o mañana si hoy ya no le toca nada)
+    val manana: Boolean,                 // true si la toma de Inicio es de mañana
+    val registrarDesde: String?,         // null = ya puede registrarla; si no, desde qué hora ("10:55 a. m.")
     val tomadasHoy: Int,
     val totalHoy: Int,
     val semana: List<DiaSemana>,
@@ -43,6 +52,7 @@ data class Panorama(
 )
 
 private data class HorarioDe(val medicina: MedicinaEntity, val horario: HorarioEntity)
+private data class Evento(val fecha: LocalDate, val de: HorarioDe)
 
 fun calcularPanorama(
     meds: List<MedicinaConHorarios>,
@@ -55,6 +65,7 @@ fun calcularPanorama(
     if (horarios.isEmpty()) return null
 
     val hoy = ahora.toLocalDate()
+    val manana = hoy.plusDays(1)
     val minutosAhora = ahora.hour * 60 + ahora.minute
     val porClave = tomas.associateBy { it.horarioId to it.fecha }
 
@@ -63,35 +74,47 @@ fun calcularPanorama(
             if (it.tomada) EstadoToma.Tomada else EstadoToma.Omitida(it.motivo ?: "Otro motivo")
         } ?: EstadoToma.Pendiente
 
-    // La toma de "ahora": la última cuya hora ya llegó; antes de la primera del día, la primera.
-    val indice = horarios.indexOfLast { it.horario.minutos <= minutosAhora + MARGEN_MINUTOS }.coerceAtLeast(0)
-    val actual = horarios[indice]
+    // Solo cuentan las pastillas de ese día: no las de antes de agregar la medicina ni las de después de que termine
+    fun delDia(fecha: LocalDate) = horarios.filter { it.medicina.tocaEn(fecha, it.horario.minutos) }
+    val deHoy = delDia(hoy)
 
-    // Las que siguen, en orden de hora: las que faltan hoy y luego las de mañana,
-    // hasta dar la vuelta completa (cada horario una vez). 30 minutos antes de su hora,
-    // la primera de esta lista sube a la tarjeta de arriba (ver MARGEN_MINUTOS).
-    val siguientes = (1..maxOf(1, horarios.size - 1)).map { k ->
-        val posicion = indice + k
-        val s = horarios[posicion % horarios.size]
-        val cuando = if (posicion < horarios.size) "Hoy" else "Mañana"
-        ProximaToma(s.medicina.nombre, "$cuando · ${horaTexto(s.horario.minutos)}")
+    // Las tomas de hoy y de mañana, en orden de hora
+    val eventos = deHoy.map { Evento(hoy, it) } + delDia(manana).map { Evento(manana, it) }
+    if (eventos.isEmpty()) return null
+
+    // La toma de "ahora": la última de hoy cuya hora ya llegó (o llega en 30 min);
+    // antes de la primera, la primera que sigue (de hoy, o de mañana si hoy ya no le toca nada).
+    val indice = eventos.indexOfLast { it.fecha == hoy && it.de.horario.minutos <= minutosAhora + MARGEN_MINUTOS }
+        .coerceAtLeast(0)
+    val actualEvento = eventos[indice]
+    val actual = actualEvento.de
+    val fechaToma = actualEvento.fecha
+
+    // Las que siguen, en orden de hora: las que faltan hoy y luego las de mañana.
+    // 30 minutos antes de su hora, la primera de esta lista sube a la tarjeta de arriba (ver MARGEN_MINUTOS).
+    val siguientes = eventos.drop(indice + 1).take(maxOf(1, horarios.size - 1)).map { e ->
+        val cuando = if (e.fecha == hoy) "Hoy" else "Mañana"
+        ProximaToma(e.de.medicina.nombre, "$cuando · ${horaTexto(e.de.horario.minutos)}")
     }
-    val siguiente = siguientes.first()
+    val siguiente = siguientes.firstOrNull()
+        ?: ProximaToma(actual.medicina.nombre, "Mañana · ${horaTexto(actual.horario.minutos)}")
 
     // Semana de lunes a domingo
     val lunes = hoy.minusDays(hoy.dayOfWeek.value - 1L)
     val letras = listOf("L", "M", "M", "J", "V", "S", "D")
     val semana = (0..6).map { i ->
         val fecha = lunes.plusDays(i.toLong())
+        val del = delDia(fecha)
         val estado = when {
             fecha.isAfter(hoy) -> EstadoDia.Futuro
             fecha == hoy -> EstadoDia.Hoy
-            horarios.all { estadoDe(it.horario, fecha) == EstadoToma.Tomada } -> EstadoDia.Completo
+            del.isEmpty() -> EstadoDia.Futuro            // ese día todavía no tenía medicinas
+            del.all { estadoDe(it.horario, fecha) == EstadoToma.Tomada } -> EstadoDia.Completo
             else -> EstadoDia.Falto
         }
         DiaSemana(letras[i], if (fecha == hoy) "Hoy" else nombreDia(fecha), estado)
     }
-    val diasTranscurridos = (hoy.dayOfWeek.value)        // lunes = 1 ... domingo = 7
+    val totalSemana = (0 until hoy.dayOfWeek.value).sumOf { delDia(lunes.plusDays(it.toLong())).size }
     val tomadasSemana = tomas.count { it.tomada && it.fecha >= lunes.toString() && it.fecha <= hoy.toString() }
 
     return Panorama(
@@ -105,18 +128,23 @@ fun calcularPanorama(
             cantidad = actual.medicina.cantidad,
             indicacion = actual.horario.indicacion
         ),
-        estado = estadoDe(actual.horario, hoy),
-        horaTomada = porClave[actual.horario.id to hoy.toString()]
+        estado = estadoDe(actual.horario, fechaToma),
+        horaTomada = porClave[actual.horario.id to fechaToma.toString()]
             ?.takeIf { it.tomada }?.let { horaDeRegistro(it.registradaEn) },
         siguiente = siguiente,
         siguientes = siguientes,
-        atrasada = actual.horario.minutos < minutosAhora - MARGEN_MINUTOS,
-        tomadasHoy = horarios.count { estadoDe(it.horario, hoy) == EstadoToma.Tomada },
-        totalHoy = horarios.size,
+        atrasada = fechaToma == hoy && actual.horario.minutos < minutosAhora - MARGEN_MINUTOS,
+        fechaToma = fechaToma,
+        manana = fechaToma != hoy,
+        registrarDesde = (actual.horario.minutos - MINUTOS_PARA_REGISTRAR).let { desde ->
+            if (fechaToma == hoy && minutosAhora >= desde) null else horaTexto(Math.floorMod(desde, 24 * 60))
+        },
+        tomadasHoy = deHoy.count { estadoDe(it.horario, hoy) == EstadoToma.Tomada },
+        totalHoy = deHoy.size,
         semana = semana,
         tomadasSemana = tomadasSemana,
-        totalSemana = horarios.size * diasTranscurridos,
-        tomasHoy = horarios.map {
+        totalSemana = totalSemana,
+        tomasHoy = deHoy.map {
             val registro = porClave[it.horario.id to hoy.toString()]
             TomaDelDia(
                 hora = horaTexto(it.horario.minutos),
@@ -128,7 +156,8 @@ fun calcularPanorama(
         medicinas = meds.map { m ->
             Medicina(
                 nombre = m.medicina.nombre,
-                frecuencia = frecuenciaTexto(m.horarios.size),
+                frecuencia = frecuenciaTexto(m.horarios.size) +
+                    (m.medicina.ultimoDia()?.let { fin -> " · ${hastaTexto(fin)}" } ?: ""),
                 para = m.medicina.para,
                 cantidad = m.medicina.cantidad,
                 indicacion = m.medicina.indicacion,

@@ -18,7 +18,13 @@ data class MedicinaEntity(
     val indicacion: String,     // "después del desayuno y después de la cena"
     val video: String,          // título del video de la medicina
     // Id de esta medicina en Firebase (pacientes/{uid}/medicinas/{nubeId}); vacío si aún no se sube
-    @ColumnInfo(defaultValue = "") val nubeId: String = ""
+    @ColumnInfo(defaultValue = "") val nubeId: String = "",
+    // Cuándo se agregó (milisegundos): las horas de ese día que ya habían pasado no cuentan. 0 = medicina de antes
+    @ColumnInfo(defaultValue = "0") val creadaEn: Long = 0,
+    // Primer día en que toca ("2026-11-10"); vacío = desde siempre
+    @ColumnInfo(defaultValue = "") val inicio: String = "",
+    // Por cuántos días se toma; 0 = siempre
+    @ColumnInfo(defaultValue = "0") val dias: Int = 0
 )
 
 /** Cada hora en que toca una medicina. [minutos] es la hora del día: 8:00 p. m. = 1200. */

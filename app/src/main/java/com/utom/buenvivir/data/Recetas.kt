@@ -36,7 +36,10 @@ data class MedicinaNube(
     val horarios: List<HorarioNube>,
     val agregadaPor: String = "",
     val quien: String = "",
-    val cambios: List<CambioDosis> = emptyList()   // historial de cambios de dosis (el más nuevo al final)
+    val cambios: List<CambioDosis> = emptyList(),  // historial de cambios de dosis (el más nuevo al final)
+    val creadaEn: Long = 0,     // cuándo se agregó (milisegundos); 0 = medicina de antes
+    val inicio: String = "",    // primer día en que toca ("2026-11-10"); vacío = desde siempre
+    val dias: Int = 0           // por cuántos días; 0 = siempre
 )
 
 /** Leer y escribir las medicinas de un paciente en Firebase (lo usan el médico y el paciente). */
@@ -66,6 +69,9 @@ object Recetas {
                 "quien" to it.quien, "rol" to it.rol
             )
         },
+        "creadaEn" to m.creadaEn,
+        "inicio" to m.inicio,
+        "dias" to m.dias,
         "actualizada" to Timestamp.now()
     )
 
@@ -73,7 +79,8 @@ object Recetas {
 
     /** "1 tableta de 850 mg después de comer · 8:00 a. m. · 8:00 p. m." */
     fun dosisTexto(m: MedicinaNube): String =
-        "${m.cantidad} ${m.indicacion} · " + m.horarios.joinToString(" · ") { horaTexto(it.minutos) }
+        "${m.cantidad} ${m.indicacion} · " + m.horarios.joinToString(" · ") { horaTexto(it.minutos) } +
+            (if (m.dias > 0) " · ${duracionTexto(m.dias).lowercase()}" else "")
 
     /**
      * Al guardar una medicina que ya existía: si cambió la dosis, la cantidad o las horas,
@@ -108,6 +115,9 @@ object Recetas {
             horarios = horarios.sortedBy { it.minutos },
             agregadaPor = doc.getString("agregadaPor") ?: "",
             quien = doc.getString("quien") ?: "",
+            creadaEn = doc.getLong("creadaEn") ?: 0L,
+            inicio = doc.getString("inicio") ?: "",
+            dias = (doc.getLong("dias") ?: 0L).toInt(),
             cambios = (doc.get("cambios") as? List<*>).orEmpty().mapNotNull { c ->
                 val mapa = c as? Map<*, *> ?: return@mapNotNull null
                 CambioDosis(
