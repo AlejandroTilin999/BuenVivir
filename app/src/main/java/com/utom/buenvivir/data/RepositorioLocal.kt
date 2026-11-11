@@ -219,8 +219,11 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
          */
         const val CARGAR_DEMO = false
 
-        /** Muestra "Reiniciar demostración" en Ajustes (para practicar y para la feria). */
-        const val MOSTRAR_REINICIAR = true
+        /**
+         * Muestra "Reiniciar demostración" en Ajustes. Apagado: en la feria se usan datos reales
+         * (se registran las tomas el día anterior), así que ya no se cargan tomas de ejemplo.
+         */
+        const val MOSTRAR_REINICIAR = false
 
         @Volatile private var instancia: RepositorioLocal? = null
 

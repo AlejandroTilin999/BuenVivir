@@ -122,13 +122,12 @@ fun BotonPrincipal(texto: String, ocupado: Boolean = false, onClick: () -> Unit)
         enabled = !ocupado,
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp)
-            .shadow(8.dp, RoundedCornerShape(32.dp), ambientColor = AzulBoton, spotColor = AzulBoton),
-        shape = RoundedCornerShape(32.dp),
+            .height(56.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = AzulBoton,
+            containerColor = TextoOscuro,          // azul marino, igual que el rediseño
             contentColor = Blanco,
-            disabledContainerColor = AzulBoton,
+            disabledContainerColor = TextoOscuro,
             disabledContentColor = Blanco
         ),
         elevation = null
@@ -136,7 +135,7 @@ fun BotonPrincipal(texto: String, ocupado: Boolean = false, onClick: () -> Unit)
         if (ocupado) {
             CircularProgressIndicator(color = Blanco, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
         } else {
-            Text(texto, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Text(texto, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Blanco)
         }
     }
 }

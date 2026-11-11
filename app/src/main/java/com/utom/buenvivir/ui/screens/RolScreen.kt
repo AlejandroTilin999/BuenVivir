@@ -3,7 +3,6 @@ package com.utom.buenvivir.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -18,88 +17,84 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.utom.buenvivir.ui.components.Iconos
-import com.utom.buenvivir.ui.medico.BotonPrincipal
-import com.utom.buenvivir.ui.theme.*
+import com.utom.buenvivir.ui.components.*
+import com.utom.buenvivir.ui.theme.BuenVivirTheme
 
 enum class RolElegido { Paciente, Familiar, Medico }
 
-/** M1: la primera vez que se abre la app en un celular. */
+/** M1: la primera vez que se abre la app en un celular. Estilo limpio. */
 @Composable
 fun RolScreen(onYaTenia: () -> Unit = {}, onContinuar: (RolElegido) -> Unit) {
     var elegido by rememberSaveable { mutableStateOf<RolElegido?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Blanco)
-    ) {
+    ConPoppins {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .background(Lavanda)
-                .statusBarsPadding()
-                .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .fillMaxSize()
+                .background(Color.White)
         ) {
-            Image(Iconos.Logo, contentDescription = "Logo de BuenVivir", modifier = Modifier.size(96.dp))
-            Text(
-                "BuenVivir",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = TextoOscuro,
-                letterSpacing = (-0.5).sp,
-                modifier = Modifier.semantics { heading() }
-            )
-            Text("¿Quién va a usar esta app?", fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = TextoLavanda)
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 24.dp)
-                .selectableGroup(),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            OpcionRol("Soy paciente", "Me recuerda mis pastillas", Iconos.Persona,
-                elegido == RolElegido.Paciente) { elegido = RolElegido.Paciente }
-            OpcionRol("Soy cuidador", "Veo si la persona que cuido tomó su medicina", Iconos.Familia,
-                elegido == RolElegido.Familiar) { elegido = RolElegido.Familiar }
-            OpcionRol("Soy médico", "Doy recetas y sigo a mis pacientes", Iconos.Estetoscopio,
-                elegido == RolElegido.Medico) { elegido = RolElegido.Medico }
-            // Paciente que cambió de celular y respaldó su cuenta
-            Text(
-                "Ya usaba BuenVivir como paciente en otro celular",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = AzulBoton,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onYaTenia)
-                    .padding(vertical = 14.dp, horizontal = 8.dp)
-            )
-        }
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .statusBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Aquí irá la foto de la persona adulta mayor; por ahora, el logo
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .size(184.dp)
+                            .clip(CircleShape)
+                            .background(FondoLavandaSuave),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(Iconos.Logo, contentDescription = "Logo de BuenVivir", modifier = Modifier.size(112.dp))
+                    }
+                }
 
-        Box(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp)
-        ) {
-            if (elegido != null) {
-                BotonPrincipal("Continuar") { elegido?.let(onContinuar) }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TituloConAcento("¿Quién va a usar ", "BuenVivir", "?", centrado = true)
+                    Text(
+                        "Elige una opción para empezar.",
+                        fontSize = 16.sp,
+                        lineHeight = 24.sp,
+                        color = TextoSuave,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.selectableGroup(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OpcionRol("Soy paciente", "Me recuerda mis pastillas", Iconos.Persona,
+                        elegido == RolElegido.Paciente) { elegido = RolElegido.Paciente }
+                    OpcionRol("Soy cuidador", "Veo si tomó su medicina", Iconos.Familia,
+                        elegido == RolElegido.Familiar) { elegido = RolElegido.Familiar }
+                    OpcionRol("Soy médico", "Sigo a mis pacientes", Iconos.Estetoscopio,
+                        elegido == RolElegido.Medico) { elegido = RolElegido.Medico }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            ) {
+                BotonOscuro("Continuar", habilitado = elegido != null) { elegido?.let(onContinuar) }
+                // Paciente que cambió de celular y respaldó su cuenta
+                EnlaceLimpio("Ya usaba BuenVivir en otro celular", onYaTenia, Modifier.fillMaxWidth())
             }
         }
     }
@@ -113,40 +108,37 @@ private fun OpcionRol(
     seleccionado: Boolean,
     onClick: () -> Unit
 ) {
-    val forma = RoundedCornerShape(22.dp)
+    val forma = RoundedCornerShape(24.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 80.dp)
             .clip(forma)
-            .background(if (seleccionado) FondoSeleccion else Blanco)
-            .border(2.dp, if (seleccionado) AzulBoton else BordeTarjeta, forma)
+            .background(if (seleccionado) SeleccionLavanda else Color.White)
+            .border(if (seleccionado) 2.dp else 1.dp, if (seleccionado) AcentoMorado else BordeSuave, forma)
             .selectable(selected = seleccionado, role = Role.RadioButton, onClick = onClick)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(if (seleccionado) AzulBoton else Lavanda),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icono, contentDescription = null, tint = if (seleccionado) Blanco else TextoChip, modifier = Modifier.size(26.dp))
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(titulo, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
-            Text(descripcion, fontSize = 16.sp, lineHeight = 21.sp, color = TextoSecundario)
+        IconoEnCirculo(
+            icono,
+            fondo = if (seleccionado) AcentoMorado else ChipLavanda,
+            tinte = if (seleccionado) Color.White else AzulNoche
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(titulo, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, color = AzulNoche)
+            Text(descripcion, fontSize = 16.sp, lineHeight = 24.sp, color = TextoSuave)
         }
         if (seleccionado) {
             Box(
                 modifier = Modifier
-                    .size(26.dp)
+                    .size(24.dp)
                     .clip(CircleShape)
-                    .background(AzulBoton),
+                    .background(AcentoMorado),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Iconos.Palomita, contentDescription = null, tint = Blanco, modifier = Modifier.size(16.dp))
+                Icon(Iconos.Palomita, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
             }
         }
     }

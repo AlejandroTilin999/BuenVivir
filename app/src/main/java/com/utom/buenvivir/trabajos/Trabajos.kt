@@ -24,6 +24,7 @@ import com.google.firebase.firestore.Source
 import com.utom.buenvivir.MainActivity
 import com.utom.buenvivir.R
 import com.utom.buenvivir.alarmas.Programador
+import com.utom.buenvivir.alarmas.PreAvisos
 import com.utom.buenvivir.data.AjustesStore
 import com.utom.buenvivir.data.MedicinaNube
 import com.utom.buenvivir.data.Recetas
@@ -84,6 +85,7 @@ class SincronizarPaciente(context: Context, params: WorkerParameters) : Coroutin
             val repo = RepositorioLocal.get(ctx)
             if (repo.sincronizar(lista)) {
                 Programador.programarTodas(ctx)
+                PreAvisos.programarTodos(ctx)
                 val a = AjustesStore(ctx).ajustes.first()
                 Reloj.enviarHorarios(ctx, a.avisarEnReloj, a.vibrarEnReloj, a.sonarEnReloj)
                 Reloj.enviarSiguiente(ctx)

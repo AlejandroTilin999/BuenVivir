@@ -129,6 +129,7 @@ object Repositorio {
 
     val motivos = listOf(
         "Se me olvidó",
+        "No estaba en casa",
         "No tenía la medicina",
         "No tenía dinero para comprarla",
         "Me da miedo",

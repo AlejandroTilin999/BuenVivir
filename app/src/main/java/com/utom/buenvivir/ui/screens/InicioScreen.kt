@@ -57,6 +57,8 @@ fun InicioScreen(
     estado: EstadoToma,
     siguiente: ProximaToma,
     horaTomada: String? = null,
+    siguientes: List<ProximaToma> = listOf(siguiente),   // todas las que vienen, en orden de hora
+    atrasada: Boolean = false,                           // ya pasó su hora y no la ha registrado
     onEscuchar: () -> Unit = {},
     onTomar: () -> Unit = {},
     onNoTomada: () -> Unit = {},
@@ -78,9 +80,19 @@ fun InicioScreen(
                 .padding(horizontal = 20.dp, vertical = 22.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            TarjetaToma(toma, estado, horaTomada, onEscuchar, onTomar, onNoTomada)
-            if (estado != EstadoToma.Pendiente) {
-                TarjetaSiguiente(siguiente)
+            TarjetaToma(toma, estado, horaTomada, atrasada, onEscuchar, onTomar, onNoTomada)
+            // Las que siguen se ven siempre, aunque la de arriba siga pendiente
+            if (siguientes.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Después",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextoOscuro,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                    siguientes.forEach { TarjetaSiguiente(it) }
+                }
             }
         }
 
@@ -171,6 +183,7 @@ private fun TarjetaToma(
     toma: Toma,
     estado: EstadoToma,
     horaTomada: String?,
+    atrasada: Boolean,
     onEscuchar: () -> Unit,
     onTomar: () -> Unit,
     onNoTomada: () -> Unit
@@ -187,7 +200,11 @@ private fun TarjetaToma(
         EstadoToma.Tomada -> Triple(ChipApagado, TextoApagado, Iconos.Palomita)
         is EstadoToma.Omitida -> Triple(ChipApagado, TextoApagado, Iconos.Menos)
     }
-    val etiquetaHora = if (estado == EstadoToma.Pendiente) "Ahora · ${toma.hora}" else "Hoy · ${toma.hora}"
+    val etiquetaHora = when {
+        estado != EstadoToma.Pendiente -> "Hoy · ${toma.hora}"
+        atrasada -> "Pendiente · ${toma.hora}"
+        else -> "Ahora · ${toma.hora}"
+    }
     val forma = RoundedCornerShape(28.dp)
 
     Column(

@@ -81,7 +81,9 @@ fun Raiz(abrirMotivo: Boolean, onMotivoAbierto: () -> Unit) {
         )
 
         // Paciente nuevo: primero escribe su nombre
+        // (todavía no tiene cuenta ni medicinas, así que puede regresar a elegir otro rol)
         rol == SesionStore.PACIENTE && nombre == null -> NombreScreen(
+            onRegresar = { guardar(null) },
             onListo = { scope.launch { sesion.guardarNombre(it) } }
         )
 

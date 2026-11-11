@@ -6,6 +6,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.utom.buenvivir.ui.components.AzulNoche
+import com.utom.buenvivir.ui.components.BotonContorno
+import com.utom.buenvivir.ui.components.BotonOscuro
+import com.utom.buenvivir.ui.components.ConPoppins
+import com.utom.buenvivir.ui.components.FondoLavandaSuave
+import com.utom.buenvivir.ui.components.IconoEnCirculo
+import com.utom.buenvivir.ui.components.TextoSuave
+import com.utom.buenvivir.ui.components.TituloConAcento
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -50,44 +60,62 @@ const val TEXTO_AVISO =
 
 @Composable
 fun AvisoPrivacidadScreen(onAceptar: () -> Unit, onEscuchar: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(Blanco)) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
-                .padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Image(Iconos.Logo, contentDescription = "Logo de BuenVivir", modifier = Modifier.size(88.dp))
-            Text(
-                "Antes de empezar",
-                fontSize = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = TextoOscuro,
-                letterSpacing = (-0.5).sp,
-                modifier = Modifier.semantics { heading() }
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                listOf(
-                    "BuenVivir guarda tus medicinas y si te las tomas.",
-                    "Solo lo ven tú y las personas que agregues con tu código.",
-                    "No se vende ni se usa para anuncios."
-                ).forEach {
-                    Text(it, fontSize = 21.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold, color = TextoNormal)
+    ConPoppins {
+        Column(modifier = Modifier.fillMaxSize().background(Blanco)) {
+            // Bloque lavanda con el logo
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                    .background(FondoLavandaSuave)
+                    .statusBarsPadding()
+                    .height(192.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(128.dp)
+                        .clip(CircleShape)
+                        .background(Blanco),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(Iconos.Logo, contentDescription = "Logo de BuenVivir", modifier = Modifier.size(80.dp))
                 }
             }
-            Text("Más detalles en Ajustes → Privacidad.", fontSize = 17.sp, color = TextoSecundario)
-            BotonEscuchar("Escuchar el aviso", LavandaChip, onEscuchar)
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 32.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                TituloConAcento("Antes de ", "empezar")
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    PuntoAviso(Iconos.Pastilla, "BuenVivir guarda tus medicinas y si te las tomas.")
+                    PuntoAviso(Iconos.Familia, "Solo lo ven tú y las personas que agregues con tu código.")
+                    PuntoAviso(Iconos.Candado, "No se vende ni se usa para anuncios.")
+                }
+                Text("Más detalles en Ajustes → Privacidad.", fontSize = 16.sp, lineHeight = 24.sp, color = TextoSuave)
+                BotonContorno("Escuchar el aviso", Iconos.Bocina, onEscuchar)
+            }
+
+            Box(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            ) {
+                BotonOscuro("Acepto", onClick = onAceptar)
+            }
         }
-        Box(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp)
-        ) {
-            BotonPrincipal("Acepto", onClick = onAceptar)
-        }
+    }
+}
+
+@Composable
+private fun PuntoAviso(icono: ImageVector, texto: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        IconoEnCirculo(icono)
+        Text(texto, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium, color = AzulNoche)
     }
 }
 

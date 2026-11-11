@@ -64,6 +64,7 @@ fun EnlaceSecundario(texto: String, onClick: () -> Unit) {
     }
 }
 
+/** Menú de abajo del paciente, estilo Android actual: píldora azul clara detrás del ícono activo. */
 @Composable
 fun MenuInferior(
     seleccionado: Int,
@@ -72,12 +73,12 @@ fun MenuInferior(
     onFamilia: () -> Unit
 ) {
     Column(modifier = Modifier.background(Blanco)) {
-        HorizontalDivider(thickness = 1.5.dp, color = LineaMenu)
+        HorizontalDivider(thickness = 1.dp, color = BordeSuave)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 18.dp)
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
         ) {
             ElementoMenu("Inicio", Iconos.Casa, seleccionado == 0, onInicio, Modifier.weight(1f))
             ElementoMenu("Mis medicinas", Iconos.Pastilla, seleccionado == 1, onMedicinas, Modifier.weight(1f))
@@ -94,7 +95,6 @@ private fun ElementoMenu(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val color = if (activo) AzulBoton else TextoSecundario
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -104,21 +104,25 @@ private fun ElementoMenu(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Icon(icono, contentDescription = null, tint = color, modifier = Modifier.size(28.dp))
-        Text(
-            texto,
-            fontSize = 16.sp,
-            fontWeight = if (activo) FontWeight.Bold else FontWeight.SemiBold,
-            color = color,
-            maxLines = 1,
-            softWrap = false
-        )
         Box(
             modifier = Modifier
-                .width(48.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(if (activo) AzulBoton else Color.Transparent)
+                .width(64.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (activo) FondoLavandaSuave else Color.Transparent),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icono, contentDescription = null, tint = if (activo) AcentoMorado else TextoSuave, modifier = Modifier.size(24.dp))
+        }
+        Text(
+            texto,
+            fontFamily = Poppins,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = if (activo) FontWeight.Bold else FontWeight.Medium,
+            color = if (activo) AzulNoche else TextoSuave,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

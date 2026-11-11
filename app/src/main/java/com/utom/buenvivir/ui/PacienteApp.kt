@@ -41,6 +41,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.utom.buenvivir.alarmas.Notificaciones
 import com.utom.buenvivir.alarmas.Programador
+import com.utom.buenvivir.alarmas.PreAvisos
 import com.utom.buenvivir.alarmas.ModoPrueba
 import com.utom.buenvivir.alarmas.PruebaRapida
 import com.utom.buenvivir.reloj.Reloj
@@ -144,6 +145,7 @@ fun PacienteApp(
     LaunchedEffect(Unit) {
         repo.prepararSiVacia()
         Programador.programarTodas(context)
+        PreAvisos.programarTodos(context)
         // Las medicinas que estaban solo en el celular se suben, y después se escucha la nube:
         // si su médico o su familia le agregan o cambian una medicina, aquí aparece sola con sus alarmas
         repo.subirSinNube()
@@ -151,7 +153,10 @@ fun PacienteApp(
             if (lista == null) return@collect
             // Si su médico o su cuidador le cambiaron la dosis, le llega una notificación
             AvisosDosis.revisar(context, lista)
-            if (repo.sincronizar(lista)) Programador.programarTodas(context)
+            if (repo.sincronizar(lista)) {
+                Programador.programarTodas(context)
+                PreAvisos.programarTodos(context)
+            }
         }
     }
 
@@ -573,6 +578,8 @@ fun PacienteApp(
                 estado = p.estado,
                 horaTomada = p.horaTomada,
                 siguiente = p.siguiente,
+                siguientes = p.siguientes,
+                atrasada = p.atrasada,
                 onEscuchar = { lector.leer(textoInicio(p, nombre)) },
                 onTomar = { registrar(tomada = true, motivo = null) },
                 onNoTomada = { mostrarMotivo = true },

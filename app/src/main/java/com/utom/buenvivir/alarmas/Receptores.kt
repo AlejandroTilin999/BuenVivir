@@ -36,6 +36,15 @@ class AlarmaReceiver : BroadcastReceiver() {
         val repo = RepositorioLocal.get(ctx)
         val h = repo.horario(horarioId) ?: return@enSegundoPlano
 
+        // Aviso 20 minutos antes: solo si todavía no respondió esa pastilla, y deja listo el de mañana
+        if (intent.getBooleanExtra(PreAvisos.EXTRA, false)) {
+            if (repo.toma(horarioId, fecha) == null) {
+                repo.medicina(h.medicinaId)?.let { PreAvisos.mostrar(ctx, h, it) }
+            }
+            PreAvisos.programarPara(ctx, h, fecha.plusDays(1))
+            return@enSegundoPlano
+        }
+
         // La alarma normal deja programada la de mañana
         if (!prueba && intento == 0) Programador.programarPara(ctx, h, fecha.plusDays(1))
 
@@ -53,6 +62,7 @@ class AlarmaReceiver : BroadcastReceiver() {
         }
 
         val m = repo.medicina(h.medicinaId) ?: return@enSegundoPlano
+        PreAvisos.quitar(ctx, horarioId)
         Notificaciones.mostrar(ctx, h, m, fecha, ajustes)
         // También al reloj, solo en el primer aviso (las repeticiones ya las tiene en pantalla)
         android.util.Log.i("Reloj", "Alarma: avisarEnReloj=${ajustes.avisarEnReloj}, intento=$intento")
@@ -83,6 +93,9 @@ class AccionReceiver : BroadcastReceiver() {
 class ArranqueReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        enSegundoPlano { Programador.programarTodas(context.applicationContext) }
+        enSegundoPlano {
+            Programador.programarTodas(context.applicationContext)
+            PreAvisos.programarTodos(context.applicationContext)
+        }
     }
 }

@@ -31,6 +31,8 @@ data class Panorama(
     val estado: EstadoToma,
     val horaTomada: String?,             // hora real en que registró la toma de Inicio
     val siguiente: ProximaToma,
+    val siguientes: List<ProximaToma>,   // las que vienen después, en orden de hora (en círculo)
+    val atrasada: Boolean,               // la toma de Inicio ya pasó hace más de 30 min y no se registra
     val tomadasHoy: Int,
     val totalHoy: Int,
     val semana: List<DiaSemana>,
@@ -65,13 +67,16 @@ fun calcularPanorama(
     val indice = horarios.indexOfLast { it.horario.minutos <= minutosAhora + MARGEN_MINUTOS }.coerceAtLeast(0)
     val actual = horarios[indice]
 
-    val siguiente = if (indice + 1 < horarios.size) {
-        val s = horarios[indice + 1]
-        ProximaToma(s.medicina.nombre, "Hoy · ${horaTexto(s.horario.minutos)}")
-    } else {
-        val s = horarios.first()
-        ProximaToma(s.medicina.nombre, "Mañana · ${horaTexto(s.horario.minutos)}")
+    // Las que siguen, en orden de hora: las que faltan hoy y luego las de mañana,
+    // hasta dar la vuelta completa (cada horario una vez). 30 minutos antes de su hora,
+    // la primera de esta lista sube a la tarjeta de arriba (ver MARGEN_MINUTOS).
+    val siguientes = (1..maxOf(1, horarios.size - 1)).map { k ->
+        val posicion = indice + k
+        val s = horarios[posicion % horarios.size]
+        val cuando = if (posicion < horarios.size) "Hoy" else "Mañana"
+        ProximaToma(s.medicina.nombre, "$cuando · ${horaTexto(s.horario.minutos)}")
     }
+    val siguiente = siguientes.first()
 
     // Semana de lunes a domingo
     val lunes = hoy.minusDays(hoy.dayOfWeek.value - 1L)
@@ -104,6 +109,8 @@ fun calcularPanorama(
         horaTomada = porClave[actual.horario.id to hoy.toString()]
             ?.takeIf { it.tomada }?.let { horaDeRegistro(it.registradaEn) },
         siguiente = siguiente,
+        siguientes = siguientes,
+        atrasada = actual.horario.minutos < minutosAhora - MARGEN_MINUTOS,
         tomadasHoy = horarios.count { estadoDe(it.horario, hoy) == EstadoToma.Tomada },
         totalHoy = horarios.size,
         semana = semana,
