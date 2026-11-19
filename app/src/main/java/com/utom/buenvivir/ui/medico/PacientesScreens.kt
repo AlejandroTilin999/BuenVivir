@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.Busqueda
 import com.utom.buenvivir.data.MedicinaNube
+import com.utom.buenvivir.ui.components.GraficaMotivos
 import com.utom.buenvivir.data.CambioDosis
 import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.Resultado
@@ -48,6 +49,7 @@ import com.utom.buenvivir.data.horaDeRegistro
 import com.utom.buenvivir.data.horaTexto
 import com.utom.buenvivir.data.nombreDia
 import com.utom.buenvivir.ui.components.Iconos
+import com.utom.buenvivir.ui.components.tarjetaSaludo
 import com.utom.buenvivir.ui.theme.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
@@ -150,10 +152,10 @@ fun PacientesScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .background(Lavanda)
                 .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 32.dp, bottom = 22.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                .tarjetaSaludo()   // misma tarjeta azul que el paciente
+                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 22.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -502,7 +504,8 @@ fun DetallePacienteScreen(
             is TomasPaciente.Listas -> {
                 val r = resumir(e.tomas, hoy, periodo)
                 TarjetaSemana(r, periodo)
-                if (r.motivos.isNotEmpty()) Motivos(r.motivos)
+                Analisis(r)
+                GraficaMotivos(r.motivos, "¿Por qué no se la tomó?", periodo.titulo)
                 if (r.recientes.isNotEmpty()) UltimasTomas(r.recientes, hoy, periodo)
                 else Text("No hay tomas registradas en este periodo.", fontSize = 17.sp, color = TextoSecundario)
             }
@@ -608,6 +611,56 @@ private fun ElegirPeriodo(elegido: Periodo, onElegir: (Periodo) -> Unit) {
                 Text(op.etiqueta, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (si) Blanco else TextoChip)
             }
         }
+    }
+}
+
+/** En qué parte del día fue una toma: mañana, tarde o noche. */
+private fun franja(minutos: Int): String = when (minutos / 60) {
+    in 5..11 -> "la mañana"
+    in 12..18 -> "la tarde"
+    else -> "la noche"
+}
+
+/**
+ * Análisis escrito para el médico: cuánto tomó, el motivo que más se repite
+ * y en qué parte del día falla más. Se arma con las mismas tomas del periodo elegido.
+ */
+@Composable
+private fun Analisis(r: Resumen) {
+    if (r.registradas == 0) return
+    val faltas = r.recientes.filter { !it.tomada }
+    val porcentaje = Math.round(r.porcentaje * 100)
+    val texto = buildString {
+        append("Tomó ${r.tomadas} de ${r.registradas} ($porcentaje %). ")
+        if (faltas.isEmpty()) {
+            append("No le faltó ninguna toma en este periodo.")
+        } else {
+            r.motivos.firstOrNull()?.let { (motivo, n) ->
+                append("El motivo más frecuente fue \u201C$motivo\u201D (${veces(n)}). ")
+            }
+            val (parte, cuantas) = faltas.groupingBy { franja(it.minutos) }.eachCount().maxBy { it.value }.toPair()
+            append(
+                if (faltas.size == 1) "La toma que faltó fue en $parte."
+                else "La mayoría de las que faltaron fueron en $parte ($cuantas de ${faltas.size})."
+            )
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .border(2.dp, Lavanda, RoundedCornerShape(22.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "Análisis",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextoLavanda,
+            modifier = Modifier.semantics { heading() }
+        )
+        Text(texto, fontSize = 17.sp, lineHeight = 25.sp, color = TextoOscuro)
     }
 }
 

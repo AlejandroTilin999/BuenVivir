@@ -80,21 +80,27 @@ fun MenuInferior(
                 .navigationBarsPadding()
                 .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
         ) {
-            ElementoMenu("Inicio", Iconos.Casa, seleccionado == 0, onInicio, Modifier.weight(1f))
-            ElementoMenu("Mis medicinas", Iconos.Pastilla, seleccionado == 1, onMedicinas, Modifier.weight(1f))
-            ElementoMenu("Mi familia", Iconos.Familia, seleccionado == 2, onFamilia, Modifier.weight(1f))
+            ElementoMenu("Inicio", Iconos.Casa, Iconos.CasaLlena, seleccionado == 0, onInicio, Modifier.weight(1f))
+            ElementoMenu("Mis medicinas", Iconos.Pastilla, Iconos.PastillaLlena, seleccionado == 1, onMedicinas, Modifier.weight(1f))
+            ElementoMenu("Mi familia", Iconos.Familia, Iconos.FamiliaLlena, seleccionado == 2, onFamilia, Modifier.weight(1f))
         }
     }
 }
 
+/**
+ * Una pestaña: ícono arriba y nombre abajo. La activa va en azul, con el ícono relleno
+ * y una rayita debajo del nombre; las demás en gris (dejan el mismo espacio para no brincar).
+ */
 @Composable
 private fun ElementoMenu(
     texto: String,
     icono: ImageVector,
+    iconoActivo: ImageVector,
     activo: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val color = if (activo) AcentoMorado else TextoSuave
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -104,25 +110,23 @@ private fun ElementoMenu(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .width(64.dp)
-                .height(32.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (activo) FondoLavandaSuave else Color.Transparent),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icono, contentDescription = null, tint = if (activo) AcentoMorado else TextoSuave, modifier = Modifier.size(24.dp))
-        }
+        Icon(if (activo) iconoActivo else icono, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
         Text(
             texto,
             fontFamily = Poppins,
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = if (activo) FontWeight.Bold else FontWeight.Medium,
-            color = if (activo) AzulNoche else TextoSuave,
+            color = color,
             maxLines = 1,
             softWrap = false
+        )
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(if (activo) AcentoMorado else Color.Transparent)
         )
     }
 }

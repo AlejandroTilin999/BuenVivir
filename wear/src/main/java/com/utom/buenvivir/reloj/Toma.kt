@@ -79,8 +79,13 @@ object Pendiente {
         preferencias(context).edit().putString(CLAVE, toma.aJson()).apply()
     }
 
-    /** Borra la pendiente solo si es esa misma toma (por si ya llegó otra). */
+    /**
+     * Ya respondió (en el celular o en el reloj). Se marca como avisada para que la alarma
+     * propia del reloj no vuelva a sonar a la hora si ya contestó antes en el celular.
+     * Borra la pendiente solo si es esa misma toma (por si ya llegó otra).
+     */
     fun borrar(context: Context, horarioId: Long, fecha: String) {
+        Horarios.marcarAvisada(context, horarioId, fecha)
         val actual = leer(context) ?: return
         if (actual.horarioId == horarioId && actual.fecha == fecha) {
             preferencias(context).edit().remove(CLAVE).apply()

@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -64,6 +65,18 @@ object Aviso {
             .addAction(0, "No me la tomé", noTomada)
             .build()
         NotificationManagerCompat.from(context).notify(ID, n)
+
+        // Prende la pantalla del reloj unos segundos, aunque esté apagada
+        runCatching {
+            val pm = context.getSystemService(PowerManager::class.java)
+            @Suppress("DEPRECATION")
+            pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "BuenVivir:alarma"
+            ).acquire(15_000L)
+        }
+        // Y abre la app con la pastilla (si Android no lo permite, queda la notificación a pantalla completa)
+        runCatching { pantallaCompleta.send() }
     }
 
     fun quitar(context: Context) {

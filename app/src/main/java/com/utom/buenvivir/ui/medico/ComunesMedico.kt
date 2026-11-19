@@ -1,5 +1,7 @@
 package com.utom.buenvivir.ui.medico
 
+import com.utom.buenvivir.ui.components.Letra
+import com.utom.buenvivir.ui.components.Tono
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -68,7 +70,7 @@ fun Campo(
 ) {
     var verContrasena by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(etiqueta, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoGris)
+        Text(etiqueta, style = Letra.TextoFuerte, color = Tono.Noche)
         OutlinedTextField(
             value = valor,
             onValueChange = onCambio,
@@ -76,12 +78,12 @@ fun Campo(
             textStyle = if (grande) {
                 TextStyle(fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 8.sp, color = TextoOscuro)
             } else {
-                TextStyle(fontSize = 18.sp, color = TextoNormal)
+                Letra.Texto.copy(color = Tono.Noche)
             },
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AzulBoton,
-                unfocusedBorderColor = BordeTarjeta,
+                focusedBorderColor = Tono.Acento,
+                unfocusedBorderColor = Tono.BordeCampo,
                 focusedContainerColor = Blanco,
                 unfocusedContainerColor = Blanco,
                 cursorColor = AzulBoton
@@ -110,7 +112,7 @@ fun Campo(
                 .fillMaxWidth()
                 .semantics { contentDescription = etiqueta }
         )
-        ayuda?.let { Text(it, fontSize = 15.sp, color = TextoSecundario) }
+        ayuda?.let { Text(it, style = Letra.Etiqueta, color = Tono.Suave) }
     }
 }
 
@@ -135,7 +137,7 @@ fun BotonPrincipal(texto: String, ocupado: Boolean = false, onClick: () -> Unit)
         if (ocupado) {
             CircularProgressIndicator(color = Blanco, strokeWidth = 3.dp, modifier = Modifier.size(28.dp))
         } else {
-            Text(texto, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Blanco)
+            Text(texto, style = Letra.Boton, color = Blanco)
         }
     }
 }
@@ -169,8 +171,8 @@ fun Regresar(texto: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Icon(Iconos.Atras, contentDescription = null, tint = TextoChip, modifier = Modifier.size(24.dp))
-        Text(texto, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextoChip)
+        Icon(Iconos.Atras, contentDescription = null, tint = Tono.Acento, modifier = Modifier.size(24.dp))
+        Text(texto, style = Letra.TextoFuerte, color = Tono.Acento)
     }
 }
 

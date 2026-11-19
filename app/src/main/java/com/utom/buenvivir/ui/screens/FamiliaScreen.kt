@@ -34,6 +34,7 @@ import com.utom.buenvivir.data.MiembroEquipo
 import com.utom.buenvivir.ui.components.BotonEscuchar
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.components.MenuInferior
+import com.utom.buenvivir.ui.components.*
 import com.utom.buenvivir.ui.theme.*
 
 /** Pantalla 6: quién acompaña al paciente (su médico y su familia), en vivo desde Firebase. */
@@ -53,55 +54,60 @@ fun FamiliaScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Blanco)
+            .background(Tono.Blanco)
     ) {
-        Encabezado(equipo.size, onEscuchar)
+        SisEncabezado("Mi familia", onEscuchar = onEscuchar) {
+            val total = equipo.size
+            Text(
+                if (total == 0) "Ellos ven si tomaste tus pastillas para poder ayudarte."
+                else "${if (total == 1) "1 persona te acompaña" else "$total personas te acompañan"}. " +
+                    "Ven si tomaste tus pastillas para poder ayudarte.",
+                style = Letra.Texto,
+                color = Tono.Suave
+            )
+        }
 
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .padding(horizontal = Espacio.M, vertical = Espacio.L),
+            verticalArrangement = Arrangement.spacedBy(Espacio.XL)
         ) {
             if (equipo.isEmpty()) {
-                Text(
-                    "Todavía no agregas a nadie. Toca el botón de abajo y dale tu código a tu médico o a un familiar.",
-                    fontSize = 18.sp,
-                    lineHeight = 26.sp,
-                    color = TextoGris,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
-                        .padding(18.dp)
-                )
+                SisCaja {
+                    Text(
+                        "Todavía no agregas a nadie. Toca el botón de abajo y dale tu código a tu médico o a un familiar.",
+                        style = Letra.Texto,
+                        color = Tono.Suave
+                    )
+                }
             }
             if (medicos.isNotEmpty()) {
-                Seccion(if (medicos.size == 1) "Tu médico" else "Tus médicos") {
-                    medicos.forEach { TarjetaMedico(it) { porQuitar = it } }
+                SisSeccion(if (medicos.size == 1) "Tu médico" else "Tus médicos") {
+                    Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                        medicos.forEach { Persona(it, esMedico = true) { porQuitar = it } }
+                    }
                 }
             }
             if (familia.isNotEmpty()) {
-                Seccion("Quienes te cuidan") {
-                    familia.forEach { TarjetaFamiliar(it) { porQuitar = it } }
+                SisSeccion("Quienes te cuidan") {
+                    Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                        familia.forEach { Persona(it, esMedico = false) { porQuitar = it } }
+                    }
                 }
             }
 
             // Abre "Mi código" para que se vinculen su médico o un familiar
-            Button(
-                onClick = onAgregar,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-                    .height(60.dp)
-                    .shadow(8.dp, RoundedCornerShape(30.dp), ambientColor = AzulBoton, spotColor = AzulBoton),
-                shape = RoundedCornerShape(30.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AzulBoton, contentColor = Blanco),
-                elevation = null
-            ) {
-                Icon(Iconos.Mas, contentDescription = null, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Agregar a alguien", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                SisBoton("Agregar a alguien", onAgregar, icono = Iconos.Mas)
+                Text(
+                    "Te mostraremos tu código para que se lo des.",
+                    style = Letra.Etiqueta,
+                    color = Tono.Suave,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         }
 
@@ -111,167 +117,64 @@ fun FamiliaScreen(
     porQuitar?.let { m ->
         AlertDialog(
             onDismissRequest = { porQuitar = null },
-            title = { Text("¿Quitar a ${m.nombre}?", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) },
-            text = {
-                Text("Ya no podrá ver si tomaste tus pastillas.", fontSize = 19.sp, lineHeight = 26.sp)
-            },
+            title = { Text("¿Quitar a ${m.nombre}?", style = Letra.Subtitulo) },
+            text = { Text("Ya no podrá ver si tomaste tus pastillas.", style = Letra.Texto) },
             confirmButton = {
                 TextButton(onClick = { porQuitar = null; onQuitar(m) }) {
-                    Text("Sí, quitar", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
+                    Text("Sí, quitar", style = Letra.TextoFuerte, color = Tono.Acento)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { porQuitar = null }) {
-                    Text("Cancelar", fontSize = 19.sp, color = TextoGris)
+                    Text("Cancelar", style = Letra.TextoFuerte, color = Tono.Suave)
                 }
             },
-            containerColor = Blanco
+            containerColor = Tono.Blanco
         )
     }
 }
 
-// Mismo alto que el encabezado de Inicio y Mis medicinas, para que no "brinque".
+/** Una persona del equipo: inicial (o estetoscopio), nombre, detalle y "Quitar". */
 @Composable
-private fun Encabezado(total: Int, onEscuchar: () -> Unit) {
-    Column(
+private fun Persona(m: MiembroEquipo, esMedico: Boolean, onQuitar: () -> Unit) {
+    val forma = RoundedCornerShape(Medida.RadioCaja)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-            .background(Lavanda)
-            .statusBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+            .heightIn(min = Medida.Fila)
+            .border(1.dp, Tono.Borde, forma)
+            .padding(start = Espacio.M, top = Espacio.S, bottom = Espacio.S),
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .size(Medida.Tactil)
+                .clip(CircleShape)
+                .background(Tono.Chip),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.weight(1f, fill = false),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    "Mi familia",
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = TextoOscuro,
-                    letterSpacing = (-0.5).sp,
-                    modifier = Modifier.semantics { heading() }
-                )
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) {
-                            append(if (total == 1) "1 persona" else "$total personas")
-                        }
-                        append(if (total == 1) " te acompaña" else " te acompañan")
-                    },
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextoLavanda
-                )
+            if (esMedico) {
+                Icon(Iconos.Estetoscopio, contentDescription = null, tint = Tono.Acento, modifier = Modifier.size(24.dp))
+            } else {
+                Text(m.nombre.take(1).uppercase(), style = Letra.Subtitulo, color = Tono.Acento)
             }
-            BotonEscuchar("Escuchar esta pantalla", Blanco, onEscuchar)
         }
-
-        Text(
-            "Ellos ven si tomaste tus pastillas para poder ayudarte.",
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = TextoGris,
-            minLines = 2,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(Blanco)
-                .padding(horizontal = 18.dp, vertical = 16.dp)
-        )
-    }
-}
-
-@Composable
-private fun Seccion(titulo: String, contenido: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            titulo,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextoOscuro,
-            modifier = Modifier.semantics { heading() }
-        )
-        contenido()
-    }
-}
-
-@Composable
-private fun TarjetaFamiliar(m: MiembroEquipo, onQuitar: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
-            .padding(start = 16.dp, end = 6.dp, top = 14.dp, bottom = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(m.nombre, style = Letra.TextoFuerte, color = Tono.Noche)
+            if (m.detalle.isNotBlank()) Text(m.detalle, style = Letra.Etiqueta, color = Tono.Suave)
+        }
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(Lavanda),
+                .heightIn(min = Medida.Tactil)
+                .clip(RoundedCornerShape(24.dp))
+                .clickable(role = Role.Button, onClickLabel = "Quitar a ${m.nombre}", onClick = onQuitar)
+                .padding(horizontal = Espacio.M),
             contentAlignment = Alignment.Center
         ) {
-            Text(m.nombre.take(1).uppercase(), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, color = TextoChip)
+            Text("Quitar", style = Letra.EtiquetaFuerte, color = Tono.Acento)
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(m.nombre, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoNormal)
-            if (m.detalle.isNotBlank()) Text(m.detalle, fontSize = 16.sp, color = TextoSecundario)
-        }
-        Quitar(m.nombre, TextoChip, onQuitar)
     }
-}
-
-@Composable
-private fun TarjetaMedico(m: MiembroEquipo, onQuitar: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(AzulClaro)
-            .padding(start = 16.dp, end = 6.dp, top = 14.dp, bottom = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(Blanco),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Iconos.Estetoscopio, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(28.dp))
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(m.nombre, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextoAzulOscuro)
-            if (m.detalle.isNotBlank()) Text(m.detalle, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoAzul)
-        }
-        Quitar(m.nombre, TextoAzulOscuro, onQuitar)
-    }
-}
-
-/** Enlace "Quitar" con área grande para tocar. */
-@Composable
-private fun Quitar(nombre: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
-    Text(
-        "Quitar",
-        fontSize = 17.sp,
-        fontWeight = FontWeight.Bold,
-        color = color,
-        textDecoration = TextDecoration.Underline,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button, onClickLabel = "Quitar a $nombre", onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 14.dp)
-    )
 }
 
 @Preview(name = "Mi familia", widthDp = 360, heightDp = 800, showBackground = true)

@@ -7,14 +7,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.TimePickerDefaults
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.*
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -47,6 +49,10 @@ import com.utom.buenvivir.data.Recetas
 import com.utom.buenvivir.data.SesionStore
 import com.utom.buenvivir.data.horaTexto
 import com.utom.buenvivir.data.inicioPara
+import com.utom.buenvivir.ui.components.Espacio
+import com.utom.buenvivir.ui.components.Letra
+import com.utom.buenvivir.ui.components.Medida
+import com.utom.buenvivir.ui.components.Tono
 import com.utom.buenvivir.data.LectorReceta
 import com.utom.buenvivir.data.Lectura
 import com.utom.buenvivir.data.MedicinaLeida
@@ -360,31 +366,28 @@ fun RecetaScreen(
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .imePadding()
-            .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(start = Espacio.M, end = Espacio.M, top = Espacio.S, bottom = Espacio.XL),
+        verticalArrangement = Arrangement.spacedBy(Espacio.L)
     ) {
-        Regresar(paciente, onRegresar)
-
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+            Regresar(paciente, onRegresar)
             Text(
                 if (inicial != null) "Cambiar medicina" else "Agregar medicina",
-                fontSize = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = TextoOscuro,
-                letterSpacing = (-0.5).sp,
+                style = Letra.Titulo,
+                color = Tono.Noche,
                 modifier = Modifier.semantics { heading() }
             )
             Text(
                 if (esPaciente) "Escríbela como te la indicó tu médico. Te sonará la alarma a las horas que elijas."
                 else "Le llega a $paciente en cuanto la guardes.",
-                fontSize = 17.sp, lineHeight = 24.sp, color = TextoSecundario
+                style = Letra.Texto, color = Tono.Suave
             )
         }
 
         if (inicial == null) {
             BotonEscanear(leyendo = leyendo, onClick = { if (!leyendo) eligiendoFoto = true })
             notaEscaneo?.let {
-                Text(it, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = TextoChip)
+                Text(it, style = Letra.TextoFuerte, color = Tono.Acento)
             }
         }
 
@@ -456,9 +459,8 @@ fun RecetaScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Lavanda)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .border(1.dp, Tono.Borde, RoundedCornerShape(Medida.RadioCaja))
+                        .padding(Espacio.M),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Row(
@@ -466,7 +468,7 @@ fun RecetaScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Para qué sirve", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextoLavanda)
+                        Text("Para qué sirve", style = Letra.EtiquetaFuerte, color = Tono.Suave)
                         Text(
                             "Cambiar",
                             fontSize = 15.sp,
@@ -478,7 +480,7 @@ fun RecetaScreen(
                                 .padding(6.dp)
                         )
                     }
-                    Text(para, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextoOscuro)
+                    Text(para, style = Letra.Grande.copy(fontWeight = FontWeight.SemiBold), color = Tono.Noche)
                     Text(if (esPaciente) "Así te lo explica la app." else "Así se lo explica la app al paciente.", fontSize = 14.sp, color = TextoLavanda)
                 }
             } else {
@@ -524,20 +526,20 @@ fun RecetaScreen(
             }
 
             // ---- Horarios ----
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Horarios", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoGris)
+            Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                Text("Horarios", style = Letra.TextoFuerte, color = Tono.Noche)
                 FilaFlexible {
                     horarios.sorted().forEach { m ->
                         Row(
                             modifier = Modifier
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Lavanda)
-                                .padding(start = 14.dp, end = 4.dp),
+                                .height(Medida.Tactil)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Tono.Chip)
+                                .padding(start = Espacio.M, end = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(horaTexto(m), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextoChip)
+                            Text(horaTexto(m), style = Letra.TextoFuerte, color = Tono.Noche)
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
@@ -545,23 +547,23 @@ fun RecetaScreen(
                                     .clickable(role = Role.Button) { horarios = horarios - m },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Iconos.Tache, contentDescription = "Quitar ${horaTexto(m)}", tint = TextoChip, modifier = Modifier.size(18.dp))
+                                Icon(Iconos.Tache, contentDescription = "Quitar ${horaTexto(m)}", tint = Tono.Suave, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
                 }
                 Row(
                     modifier = Modifier
-                        .height(48.dp)
-                        .border(2.dp, AzulBoton, RoundedCornerShape(24.dp))
+                        .height(Medida.Tactil)
+                        .border(1.dp, Tono.BordeCampo, RoundedCornerShape(24.dp))
                         .clip(RoundedCornerShape(24.dp))
                         .clickable(role = Role.Button) { eligiendoHora = true }
-                        .padding(horizontal = 18.dp),
+                        .padding(horizontal = Espacio.M),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Espacio.S)
                 ) {
-                    Icon(Iconos.Mas, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(18.dp))
-                    Text("Agregar hora", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
+                    Icon(Iconos.Mas, contentDescription = null, tint = Tono.Acento, modifier = Modifier.size(20.dp))
+                    Text("Agregar hora", style = Letra.TextoFuerte, color = Tono.Noche)
                 }
             }
 
@@ -582,20 +584,20 @@ fun RecetaScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(2.dp, Subrayado, RoundedCornerShape(18.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                        .clip(RoundedCornerShape(Medida.RadioCaja))
+                        .background(Tono.Chip)
+                        .padding(Espacio.M),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(if (esPaciente) "Así lo verás" else "Así lo verá $paciente", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextoLavanda)
+                    Text(if (esPaciente) "Así lo verás" else "Así lo verá $paciente", style = Letra.EtiquetaFuerte, color = Tono.Acento)
                     Text(
                         buildAnnotatedString {
                             append("$nombre: toma ")
                             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(cantidadCompleta) }
                             append(" $momento.")
                         },
-                        fontSize = 17.sp,
-                        lineHeight = 24.sp,
-                        color = TextoNormal
+                        style = Letra.Texto,
+                        color = Tono.Noche
                     )
                 }
             }
@@ -730,64 +732,69 @@ private fun preguntaDe(p: PasoVoz): String = when (p) {
 /** Botón para llenar la medicina con la foto de la receta. */
 @Composable
 private fun BotonEscanear(leyendo: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .border(2.dp, AzulBoton, RoundedCornerShape(22.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Box(
-            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(26.dp)).background(Lavanda),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Iconos.Camara, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(30.dp))
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                if (leyendo) "Leyendo la receta…" else "Escanear receta",
-                fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoOscuro
-            )
-            Text(
-                if (leyendo) "Espera unos segundos." else "Toma una foto y se llena sola.",
-                fontSize = 16.sp, color = TextoLavanda
-            )
-        }
-    }
+    BotonGrande(
+        icono = Iconos.Camara,
+        titulo = if (leyendo) "Leyendo la receta…" else "Escanear receta",
+        detalle = if (leyendo) "Espera unos segundos." else "Toma una foto y se llena sola.",
+        activo = false,
+        contorno = true,
+        onClick = onClick
+    )
 }
 
 /** Botón grande para llenar la medicina hablando. */
 @Composable
 private fun BotonVoz(escuchando: Boolean, onClick: () -> Unit) {
+    BotonGrande(
+        icono = Iconos.Microfono,
+        titulo = if (escuchando) "Te estoy preguntando…" else "Dímela con tu voz",
+        detalle = if (escuchando) "Toca aquí para parar." else "Te pregunto y tú me contestas.",
+        activo = escuchando,
+        contorno = false,
+        onClick = onClick
+    )
+}
+
+/** Botón de 80 de alto con ícono en círculo de 48, título y detalle. */
+@Composable
+private fun BotonGrande(
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    titulo: String,
+    detalle: String,
+    activo: Boolean,
+    contorno: Boolean,
+    onClick: () -> Unit
+) {
+    val forma = RoundedCornerShape(Medida.RadioCaja)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(if (escuchando) AzulBoton else Lavanda)
+            .heightIn(min = 80.dp)
+            .clip(forma)
+            .then(
+                when {
+                    activo -> Modifier.background(Tono.Noche)
+                    contorno -> Modifier.border(1.dp, Tono.Acento, forma).background(Tono.Blanco)
+                    else -> Modifier.background(Tono.Chip)
+                }
+            )
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(Espacio.M),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M)
     ) {
         Box(
-            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(26.dp)).background(Blanco),
+            modifier = Modifier
+                .size(Medida.Tactil)
+                .clip(RoundedCornerShape(24.dp))
+                .background(if (contorno) Tono.Chip else Tono.Blanco),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Iconos.Microfono, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(30.dp))
+            Icon(icono, contentDescription = null, tint = Tono.Acento, modifier = Modifier.size(24.dp))
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                if (escuchando) "Te estoy preguntando…" else "Dímela con tu voz",
-                fontSize = 21.sp, fontWeight = FontWeight.ExtraBold,
-                color = if (escuchando) Blanco else TextoOscuro
-            )
-            Text(
-                if (escuchando) "Toca aquí para parar." else "Te pregunto y tú me contestas.",
-                fontSize = 16.sp, color = if (escuchando) Blanco else TextoLavanda
-            )
+        Column {
+            Text(titulo, style = Letra.Grande.copy(fontWeight = FontWeight.Bold), color = if (activo) Tono.Blanco else Tono.Noche)
+            Text(detalle, style = Letra.Etiqueta, color = if (activo) Tono.Blanco else Tono.Suave)
         }
     }
 }
@@ -836,26 +843,53 @@ private fun valoresIniciales(m: MedicinaNube?): ValoresIniciales {
         base.cantidad, base.otraCantidad, base.momento, base.horarios, duracion, otros)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Elegir la hora girando dos ruedas, como en la alarma del celular: horas de 1 a 12, minutos de 1 en 1
+ * y "a. m." o "p. m.". Empieza en la hora de ahora + 1 minuto (útil para probar). Debajo dice cómo se verá.
+ */
 @Composable
 private fun ElegirHora(onCancelar: () -> Unit, onListo: (Int) -> Unit) {
-    val estado = rememberTimePickerState(initialHour = 8, initialMinute = 0, is24Hour = false)
+    val inicio = remember { java.time.LocalTime.now().plusMinutes(1) }
+    var hora by remember { mutableIntStateOf((inicio.hour + 11) % 12 + 1) }   // 1..12
+    var minuto by remember { mutableIntStateOf(inicio.minute) }
+    var tarde by remember { mutableStateOf(inicio.hour >= 12) }               // p. m.
+    val total = ((hora % 12) + if (tarde) 12 else 0) * 60 + minuto
     AlertDialog(
         onDismissRequest = onCancelar,
         title = { Text("¿A qué hora?", fontWeight = FontWeight.ExtraBold) },
         text = {
-            TimeInput(
-                state = estado,
-                colors = TimePickerDefaults.colors(
-                    timeSelectorSelectedContainerColor = Lavanda,
-                    timeSelectorSelectedContentColor = TextoOscuro,
-                    periodSelectorSelectedContainerColor = Lavanda,
-                    periodSelectorSelectedContentColor = TextoOscuro
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Rueda((1..12).toList(), inicial = hora, onCambio = { hora = it }, descripcion = "Hora", modifier = Modifier.weight(1f))
+                    Text(":", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = TextoOscuro,
+                        modifier = Modifier.padding(horizontal = 8.dp))
+                    Rueda((0..59).toList(), inicial = minuto, onCambio = { minuto = it }, descripcion = "Minutos", modifier = Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(false to "a. m.", true to "p. m.").forEach { (esTarde, etiqueta) ->
+                        val activa = tarde == esTarde
+                        Box(
+                            modifier = Modifier
+                                .height(Medida.Tactil)
+                                .clip(RoundedCornerShape(24.dp))
+                                .then(if (activa) Modifier.background(Tono.Noche) else Modifier.border(1.dp, Tono.BordeCampo, RoundedCornerShape(24.dp)))
+                                .clickable(role = Role.RadioButton) { tarde = esTarde }
+                                .semantics { selected = activa }
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(etiqueta, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (activa) Blanco else TextoOscuro)
+                        }
+                    }
+                }
+                Text(
+                    "Sonará a las ${horaTexto(total)}",
+                    fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TextoLavanda
                 )
-            )
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onListo(estado.hour * 60 + estado.minute) }) {
+            TextButton(onClick = { onListo(total) }) {
                 Text("Agregar", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
             }
         },
@@ -866,26 +900,87 @@ private fun ElegirHora(onCancelar: () -> Unit, onListo: (Int) -> Unit) {
     )
 }
 
+/** Una rueda que se gira con el dedo; el número del centro es el elegido. También se puede tocar un número. */
+@Composable
+private fun Rueda(
+    valores: List<Int>,
+    inicial: Int,
+    onCambio: (Int) -> Unit,
+    descripcion: String,
+    modifier: Modifier = Modifier
+) {
+    val alto = 56.dp
+    val estado = rememberLazyListState(initialFirstVisibleItemIndex = valores.indexOf(inicial).coerceAtLeast(0))
+    val alcance = rememberCoroutineScope()
+    // El que queda más cerca del centro
+    val centro by remember {
+        derivedStateOf {
+            val info = estado.layoutInfo
+            val mitad = (info.viewportStartOffset + info.viewportEndOffset) / 2
+            info.visibleItemsInfo.minByOrNull { kotlin.math.abs(it.offset + it.size / 2 - mitad) }?.index
+                ?: estado.firstVisibleItemIndex
+        }
+    }
+    LaunchedEffect(centro) { onCambio(valores[centro.coerceIn(0, valores.lastIndex)]) }
+
+    Box(modifier.height(alto * 3), contentAlignment = Alignment.Center) {
+        // Franja del número elegido
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(alto)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Tono.Fondo)
+        )
+        LazyColumn(
+            state = estado,
+            flingBehavior = rememberSnapFlingBehavior(estado, snapPosition = SnapPosition.Center),
+            contentPadding = PaddingValues(vertical = alto),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = descripcion }
+        ) {
+            items(valores.size) { i ->
+                val elegido = i == centro
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(alto)
+                        .clickable(role = Role.Button) { alcance.launch { estado.animateScrollToItem(i) } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        valores[i].toString().padStart(2, '0'),
+                        fontSize = if (elegido) 34.sp else 24.sp,
+                        fontWeight = if (elegido) FontWeight.ExtraBold else FontWeight.Medium,
+                        color = if (elegido) TextoOscuro else TextoGris
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** Un grupo de opciones en forma de píldora; solo se puede elegir una. */
 @Composable
 private fun Opciones(titulo: String, opciones: List<String>, elegida: String?, onElegir: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(titulo, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoGris)
+    Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+        Text(titulo, style = Letra.TextoFuerte, color = Tono.Noche)
         FilaFlexible {
             opciones.forEach { o ->
                 val activa = o == elegida
                 Box(
                     modifier = Modifier
-                        .height(48.dp)
-                        .border(2.dp, if (activa) AzulBoton else BordeTarjeta, RoundedCornerShape(24.dp))
+                        .height(Medida.Tactil)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(if (activa) AzulBoton else Blanco)
+                        .then(if (activa) Modifier.background(Tono.Noche) else Modifier.border(1.dp, Tono.BordeCampo, RoundedCornerShape(24.dp)).background(Tono.Blanco))
                         .clickable(role = Role.RadioButton) { onElegir(o) }
                         .semantics { selected = activa }
-                        .padding(horizontal = 18.dp),
+                        .padding(horizontal = Espacio.M),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(o, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (activa) Blanco else TextoChip)
+                    Text(o, style = Letra.TextoFuerte, color = if (activa) Tono.Blanco else Tono.Noche)
                 }
             }
         }

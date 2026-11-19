@@ -1,5 +1,6 @@
 package com.utom.buenvivir.ui
 
+import com.utom.buenvivir.ui.components.contarMotivos
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -182,6 +183,8 @@ fun PacienteApp(
     val hoy = ahora.toLocalDate()
     val lunes = hoy.minusDays(hoy.dayOfWeek.value - 1L)
     val tomas by remember(lunes) { repo.tomasDesde(lunes) }.collectAsState(initial = emptyList())
+    // Los últimos 30 días, para la gráfica de por qué no se la tomó
+    val tomasMes by remember(hoy) { repo.tomasDesde(hoy.minusDays(29)) }.collectAsState(initial = emptyList())
     // La medicina que se abrió en "Mis medicinas" (si no hay, la primera)
     var abiertaId by rememberSaveable { mutableStateOf<Long?>(null) }
     val medicinaId = meds.firstOrNull { it.medicina.id == abiertaId }?.medicina?.id ?: meds.firstOrNull()?.medicina?.id
@@ -440,6 +443,25 @@ fun PacienteApp(
                     onEscuchar = { lector.leer(textoAjustes(ajustes)) },
                     onAbrirOpcion = { pestana = pestanaDeOpcion(it) ?: pestana },
                     respaldada = correoRespaldo != null,
+                    onQuitarDemo = {
+                        scope.launch {
+                            val n = repo.quitarDemo()
+                            Programador.programarTodas(context)
+                            avisar(if (n > 0) "Se quitó la medicina de ejemplo" else "No hay medicina de ejemplo")
+                        }
+                    },
+                    onProbarDemo = {
+                        scope.launch {
+                            val h = repo.horarioDemo()
+                            if (h == null) {
+                                avisar("No se pudo preparar la demostración")
+                            } else {
+                                Programador.programarTodas(context)
+                                PruebaRapida.programar(context, h.id, java.time.LocalDate.now())
+                                avisar("Sonará en ${PruebaRapida.SEGUNDOS} segundos")
+                            }
+                        }
+                    },
                     mostrarDemo = false,
                     puedeProbar = false,
                     onIrMedicinas = { pestana = 1 },
@@ -493,6 +515,7 @@ fun PacienteApp(
                 totalSemana = p.totalSemana,
                 tomasHoy = p.tomasHoy,
                 medicinas = p.medicinas,
+                motivos = contarMotivos(tomasMes.filter { !it.tomada }.map { it.motivo }),
                 onEscuchar = { lector.leer(textoMedicinas(p)) },
                 onAbrirMedicina = { abiertaId = it.id; pestana = 3 },
                 onAgregar = { errorMed = null; pestana = 13 },
@@ -539,7 +562,23 @@ fun PacienteApp(
                         }
                         Unit
                     }
-                },
+                } ?: if (misNube?.none { it.id == nubeId } != false) {
+                    // La que no está en la nube como suya (por ejemplo, la Metformina de la demostración):
+                    // se quita del celular y, si se alcanzó a subir, también de Firebase
+                    {
+                        scope.launch {
+                            val uid = Nube.miId()
+                            if (uid != null && !nubeId.isNullOrEmpty()) {
+                                withTimeoutOrNull(6_000) { Recetas.quitar(uid, nubeId) }
+                            }
+                            repo.quitarMedicina(medicina.id)
+                            Programador.programarTodas(context)
+                            pestana = 1
+                            avisar("Se quitó ${medicina.nombre}")
+                        }
+                        Unit
+                    }
+                } else null,
                 onRegresar = { pestana = 1 },
                 onEscuchar = { lector.leer(textoDetalle(medicina)) },
                 onVerVideo = {}, // el video se conecta después
@@ -561,6 +600,25 @@ fun PacienteApp(
                 onProbarRecordatorio = {
                     PruebaRapida.programar(context, p.horario.id, p.fechaToma)
                     avisar("Sonará en ${PruebaRapida.SEGUNDOS} segundos")
+                },
+                onQuitarDemo = {
+                    scope.launch {
+                        val n = repo.quitarDemo()
+                        Programador.programarTodas(context)
+                        avisar(if (n > 0) "Se quitó la medicina de ejemplo" else "No hay medicina de ejemplo")
+                    }
+                },
+                onProbarDemo = {
+                    scope.launch {
+                        val h = repo.horarioDemo()
+                        if (h == null) {
+                            avisar("No se pudo preparar la demostración")
+                        } else {
+                            Programador.programarTodas(context)
+                            PruebaRapida.programar(context, h.id, java.time.LocalDate.now())
+                            avisar("Sonará en ${PruebaRapida.SEGUNDOS} segundos")
+                        }
+                    }
                 },
                 mostrarDemo = RepositorioLocal.MOSTRAR_REINICIAR,
                 onReiniciarDemo = {

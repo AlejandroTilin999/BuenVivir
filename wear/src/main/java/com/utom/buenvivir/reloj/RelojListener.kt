@@ -42,6 +42,8 @@ class RelojListener : WearableListenerService() {
             Telefono.LISTO -> {
                 val o = runCatching { JSONObject(texto) }.getOrNull() ?: return
                 val antes = Pendiente.leer(this)
+                // Ya respondió en el celular (aunque sea antes de la hora): la alarma del reloj ya no suena
+                Horarios.marcarAvisada(this, o.optLong("horarioId"), o.optString("fecha"))
                 Pendiente.borrar(this, o.optLong("horarioId"), o.optString("fecha"))
                 // Si ya no hay pendiente, se quita la notificación
                 if (antes != null && Pendiente.leer(this) == null) {

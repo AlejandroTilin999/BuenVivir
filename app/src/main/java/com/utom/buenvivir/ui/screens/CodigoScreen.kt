@@ -71,7 +71,7 @@ private val IconoEnviar = trazo(
     "M15 19a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.6 13.5l6.8 4", "M15.4 6.5l-6.8 4"
 )
 
-/** Pantalla 8: el código del paciente para que lo vinculen su médico o su familia. Estilo limpio. */
+/** Pantalla 8: el código del paciente para que lo vinculen su médico o su familia. */
 @Composable
 fun CodigoScreen(
     estado: EstadoCodigo,
@@ -84,107 +84,71 @@ fun CodigoScreen(
     val context = LocalContext.current
     val portapapeles = LocalClipboardManager.current
 
-    ConPoppins {
-        Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            Column(
+    Column(modifier = Modifier.fillMaxSize().background(Tono.Blanco)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(start = Espacio.M, end = Espacio.M, top = Espacio.S, bottom = Espacio.L),
+            verticalArrangement = Arrangement.spacedBy(Espacio.M)
+        ) {
+            SisRegresar("Mi familia", onRegresar)
+
+            SisTarjetaAzul {
+                Text(
+                    buildAnnotatedString {
+                        append("Tu ")
+                        withStyle(SpanStyle(color = Tono.Acento)) { append("código") }
+                    },
+                    style = Letra.Titulo,
+                    color = Tono.Noche,
+                    modifier = Modifier.semantics { heading() }
+                )
+                Text("Dáselo a tu médico o a un familiar.", style = Letra.Texto, color = Tono.Noche)
+            }
+
+            // Cuadro blanco con borde gris; Escuchar flota en la esquina
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth()
+                    .border(1.5.dp, Tono.BordeFuerte, RoundedCornerShape(Medida.RadioTarjeta))
             ) {
-                // Bloque azul claro de arriba
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                        .background(FondoLavandaSuave)
-                        .statusBarsPadding()
-                        .padding(16.dp)
+                        .padding(horizontal = Espacio.M, vertical = Espacio.L),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Espacio.M)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .clickable(role = Role.Button, onClick = onRegresar)
-                            .semantics { contentDescription = "Regresar" },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Iconos.Atras, contentDescription = null, tint = AzulNoche, modifier = Modifier.size(24.dp))
-                    }
                     Text(
-                        buildAnnotatedString {
-                            append("Tu ")
-                            withStyle(SpanStyle(color = AcentoMorado)) { append("código") }
-                        },
-                        fontSize = 32.sp,
-                        lineHeight = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.4).sp,
-                        color = AzulNoche,
+                        "Tu código es",
+                        style = Letra.Subtitulo,
+                        color = Tono.Noche,
                         modifier = Modifier
-                            .padding(top = 16.dp)
-                            .semantics { heading() }
+                            .fillMaxWidth()
+                            .heightIn(min = Medida.Tactil)
+                            .wrapContentHeight(Alignment.CenterVertically)
                     )
-                    Text(
-                        "Dáselo a tu médico o a un familiar.",
-                        fontSize = 18.sp,
-                        lineHeight = 28.sp,
-                        color = TextoSuave,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                    )
-                }
-
-                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 40.dp)) {
                     when (estado) {
-                        EstadoCodigo.Cargando -> Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            CircularProgressIndicator(color = AcentoMorado, modifier = Modifier.size(40.dp))
-                            Text("Creando tu código…", fontSize = 18.sp, lineHeight = 28.sp, color = TextoSuave)
+                        EstadoCodigo.Cargando -> {
+                            CircularProgressIndicator(color = Tono.Acento, modifier = Modifier.size(40.dp))
+                            Text("Creando tu código…", style = Letra.Texto, color = Tono.Suave)
                         }
 
                         is EstadoCodigo.Listo -> {
-                            // El código solo, grande y centrado, con una línea fina abajo
+                            CodigoEnCuadros(estado.codigo)
                             Text(
-                                codigoEnGrupos(estado.codigo),
-                                fontSize = 48.sp,
-                                lineHeight = 56.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 12.sp,
-                                color = AzulNoche,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 24.dp)
-                                    // El lector de pantalla lo deletrea: "K, 7, M, 2, Q, 9"
-                                    .semantics {
-                                        contentDescription = "Tu código: " + estado.codigo.toList().joinToString(", ")
-                                    }
+                                "Así sabrán si tomas tus pastillas.",
+                                style = Letra.Texto,
+                                color = Tono.Suave,
+                                textAlign = TextAlign.Center
                             )
-                            HorizontalDivider(thickness = 1.dp, color = BordeSuave)
-                            Row(
-                                modifier = Modifier.padding(top = 24.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Column(
+                                modifier = Modifier.padding(top = Espacio.S),
+                                verticalArrangement = Arrangement.spacedBy(Espacio.S)
                             ) {
-                                // Escuchar: solo el ícono
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .border(1.dp, BordeCampo, CircleShape)
-                                        .clickable(role = Role.Button, onClick = onEscuchar),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Iconos.Bocina, contentDescription = "Escuchar el código",
-                                        tint = AcentoMorado, modifier = Modifier.size(24.dp))
-                                }
-                                BotonCodigo("Copiar", IconoCopiar, oscuro = false, Modifier.weight(1f)) {
-                                    portapapeles.setText(AnnotatedString(estado.codigo))
-                                    Toast.makeText(context, "Código copiado", Toast.LENGTH_SHORT).show()
-                                }
-                                BotonCodigo("Enviar", IconoEnviar, oscuro = true, Modifier.weight(1f)) {
+                                SisBoton("Enviar mi código", {
                                     val texto = "Mi código de BuenVivir es ${codigoEnGrupos(estado.codigo)}. " +
                                         "Escríbelo en tu app para ver si tomo mis pastillas."
                                     val envio = Intent(Intent.ACTION_SEND).apply {
@@ -192,54 +156,70 @@ fun CodigoScreen(
                                         putExtra(Intent.EXTRA_TEXT, texto)
                                     }
                                     context.startActivity(Intent.createChooser(envio, "Enviar mi código"))
-                                }
+                                }, icono = IconoEnviar)
+                                SisBoton("Copiar", {
+                                    portapapeles.setText(AnnotatedString(estado.codigo))
+                                    Toast.makeText(context, "Código copiado", Toast.LENGTH_SHORT).show()
+                                }, icono = IconoCopiar, contorno = true)
                             }
                         }
 
-                        EstadoCodigo.Error -> Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            MensajeEnLinea("No se pudo mostrar tu código. Revisa que tengas internet.")
-                            BotonOscuro("Intentar otra vez", onClick = onReintentar)
+                        EstadoCodigo.Error -> {
+                            Text(
+                                "No se pudo mostrar tu código. Revisa que tengas internet.",
+                                style = Letra.TextoFuerte,
+                                color = RojoError,
+                                textAlign = TextAlign.Center
+                            )
+                            SisBoton("Intentar otra vez", onReintentar)
                         }
                     }
+                }
+                Box(modifier = Modifier.align(Alignment.TopEnd).padding(Espacio.M)) {
+                    SisBotonIcono(Iconos.Bocina, "Escuchar el código", Tono.Chip, Tono.Acento, onEscuchar)
                 }
             }
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.fillMaxWidth().padding(top = Espacio.S),
+                horizontalArrangement = Arrangement.spacedBy(Espacio.S, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Iconos.Candado, contentDescription = null, tint = TextoSuave, modifier = Modifier.size(16.dp))
-                Text("Solo dáselo a personas de confianza.", fontSize = 14.sp, lineHeight = 20.sp, color = TextoSuave)
+                Icon(Iconos.Candado, contentDescription = null, tint = Tono.Suave, modifier = Modifier.size(20.dp))
+                Text("Solo dáselo a personas de confianza.", style = Letra.Etiqueta, color = Tono.Suave)
             }
-
-            MenuInferior(seleccionado = 2, onInicio = onIrInicio, onMedicinas = onIrMedicinas, onFamilia = onRegresar)
         }
+
+        MenuInferior(seleccionado = 2, onInicio = onIrInicio, onMedicinas = onIrMedicinas, onFamilia = onRegresar)
     }
 }
 
-/** Botón de 56 en forma de píldora: "Copiar" con borde, "Enviar" azul marino. */
+/** El código en cuadritos blancos con borde gris oscuro: 3 juntos, un espacio más grande, y 3 juntos. */
 @Composable
-private fun BotonCodigo(texto: String, icono: ImageVector, oscuro: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val forma = RoundedCornerShape(28.dp)
+private fun CodigoEnCuadros(codigo: String) {
     Row(
-        modifier = modifier
-            .height(56.dp)
-            .clip(forma)
-            .then(if (oscuro) Modifier.background(AzulNoche) else Modifier.border(1.dp, BordeCampo, forma))
-            .clickable(role = Role.Button, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .fillMaxWidth()
+            // El lector de pantalla lo deletrea: "K, 7, M, 2, Q, 9"
+            .semantics(mergeDescendants = true) { contentDescription = "Tu código: " + codigo.toList().joinToString(", ") },
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M, Alignment.CenterHorizontally)
     ) {
-        Icon(icono, contentDescription = null, tint = if (oscuro) Color.White else AcentoMorado, modifier = Modifier.size(20.dp))
-        Text(texto, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold,
-            color = if (oscuro) Color.White else AzulNoche)
+        codigo.chunked(3).forEach { grupo ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                grupo.forEach { letra ->
+                    Box(
+                        modifier = Modifier
+                            .width(44.dp)
+                            .height(64.dp)
+                            .border(2.dp, Tono.Suave, RoundedCornerShape(12.dp))
+                            .background(Tono.Blanco, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(letra.toString(), style = Letra.Titulo.copy(fontSize = 36.sp, lineHeight = 44.sp), color = Tono.Noche)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -78,7 +78,7 @@ val ChipLavanda = Color(0xFFEFF4FF)       // círculos de los íconos y etiqueta
 val SeleccionLavanda = Color(0xFFF3F7FF)  // fondo de la opción elegida
 val BordeSuave = Color(0xFFE1E7F2)
 val BordeCampo = Color(0xFFAEB9D0)        // borde de los campos de texto (fondo blanco)
-val TextoSuave = Color(0xFF5B6170)
+val TextoSuave = Color(0xFF3A4150)   // gris oscuro: se lee bien
 val RojoError = Color(0xFFB3261E)         // errores: borde del campo y mensaje debajo
 
 /** Íconos de trazo para los mensajes: círculo con "!" y círculo con palomita. */

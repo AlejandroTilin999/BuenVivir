@@ -29,6 +29,9 @@ private const val MARGEN_MINUTOS = 30
 /** Minutos antes de la hora en que ya puede marcar "Tomar pastilla" o "No me la tomé". */
 private const val MINUTOS_PARA_REGISTRAR = 5
 
+/** Una pastilla sin registrar se queda arriba hasta 3 horas después de su hora (luego la alarma la marca sola). */
+private const val MINUTOS_PENDIENTE = 180
+
 /** Todo lo que muestran las pantallas, calculado con lo que hay en la base de datos. */
 data class Panorama(
     val hoy: LocalDate,
@@ -82,10 +85,17 @@ fun calcularPanorama(
     val eventos = deHoy.map { Evento(hoy, it) } + delDia(manana).map { Evento(manana, it) }
     if (eventos.isEmpty()) return null
 
-    // La toma de "ahora": la última de hoy cuya hora ya llegó (o llega en 30 min);
-    // antes de la primera, la primera que sigue (de hoy, o de mañana si hoy ya no le toca nada).
-    val indice = eventos.indexOfLast { it.fecha == hoy && it.de.horario.minutos <= minutosAhora + MARGEN_MINUTOS }
-        .coerceAtLeast(0)
+    // La toma de "ahora", entre las de hoy cuya hora ya llegó (o llega en 30 min):
+    //  - si hay alguna sin registrar de las últimas 3 horas, la más temprana (así, si dos tocan a la misma hora
+    //    o casi juntas, primero sale una y al registrarla sale la otra);
+    //  - si no, la última.
+    // Antes de la primera, la primera que sigue (de hoy, o de mañana si hoy ya no le toca nada).
+    val llegaron = eventos.indices.filter { eventos[it].fecha == hoy && eventos[it].de.horario.minutos <= minutosAhora + MARGEN_MINUTOS }
+    val sinRegistrar = llegaron.firstOrNull { i ->
+        val e = eventos[i]
+        e.de.horario.minutos >= minutosAhora - MINUTOS_PENDIENTE && estadoDe(e.de.horario, hoy) == EstadoToma.Pendiente
+    }
+    val indice = sinRegistrar ?: llegaron.lastOrNull() ?: 0
     val actualEvento = eventos[indice]
     val actual = actualEvento.de
     val fechaToma = actualEvento.fecha

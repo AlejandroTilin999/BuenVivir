@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.Ajustes
 import com.utom.buenvivir.data.Repositorio
-import com.utom.buenvivir.ui.components.BotonEscuchar
+import com.utom.buenvivir.ui.components.*
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.components.MenuInferior
 import com.utom.buenvivir.ui.theme.*
@@ -47,6 +47,8 @@ fun AjustesScreen(
     onEscuchar: () -> Unit = {},
     onProbarRecordatorio: () -> Unit = {},
     onReiniciarDemo: () -> Unit = {},
+    onProbarDemo: (() -> Unit)? = null,  // carga la Metformina si hace falta y suena en 10 s (celular y reloj)
+    onQuitarDemo: (() -> Unit)? = null,  // quita la Metformina de ejemplo
     mostrarDemo: Boolean = true,      // "Para la demostración" solo en el celular de la feria
     puedeProbar: Boolean = true,      // sin medicinas no hay qué probar
     onAbrirOpcion: (String) -> Unit = {},
@@ -57,63 +59,40 @@ fun AjustesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Blanco)
+            .background(Tono.Blanco)
     ) {
+        SisEncabezado("Ajustes", onEscuchar = onEscuchar, regresar = "Inicio" to onRegresar)
+
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
+                .padding(horizontal = Espacio.M, vertical = Espacio.L),
+            verticalArrangement = Arrangement.spacedBy(Espacio.XL)
         ) {
-            // Regresar + título
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .clickable(role = Role.Button, onClick = onRegresar)
-                        .padding(end = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(Iconos.Atras, contentDescription = null, tint = TextoChip, modifier = Modifier.size(24.dp))
-                    Text("Inicio", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextoChip)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Ajustes",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextoOscuro,
-                        letterSpacing = (-0.5).sp,
-                        modifier = Modifier.semantics { heading() }
-                    )
-                    BotonEscuchar("Escuchar esta pantalla", LavandaChip, onEscuchar)
+            // ---------- Demostración rápida (hasta arriba, para la feria) ----------
+            if (onProbarDemo != null) SisSeccion("Para la demostración") {
+                Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                    SisBoton("Probar: suena en 10 segundos", onProbarDemo, icono = Iconos.Campana)
+                    if (onQuitarDemo != null) SisBoton("Quitar medicina de ejemplo", onQuitarDemo, contorno = true)
                 }
             }
 
             // ---------- Alarma ----------
-            Seccion("Alarma de tus pastillas") {
-                Tarjeta(arriba = 4, abajo = 16) {
+            SisSeccion("Alarma de tus pastillas") {
+                Tarjeta {
                     FilaInterruptor("Sonido", ajustes.sonido) { onCambiar(ajustes.copy(sonido = it)) }
-                    Divisor()
+                    SisSeparador()
                     FilaInterruptor("Vibración", ajustes.vibracion) { onCambiar(ajustes.copy(vibracion = it)) }
-                    Divisor()
+                    SisSeparador()
                     FilaOpcion("Tono", com.utom.buenvivir.alarmas.Tonos.valido(ajustes.tono)) { onAbrirOpcion("tono") }
-                    Divisor()
+                    SisSeparador()
                     // Cada toque cambia: 5 → 10 → 15 → 5 minutos
                     FilaOpcion("Repetir si no respondo", "Cada ${ajustes.repetirMinutos} min") {
                         val siguiente = when (ajustes.repetirMinutos) { 5 -> 10; 10 -> 15; else -> 5 }
                         onCambiar(ajustes.copy(repetirMinutos = siguiente))
                     }
-                    Divisor()
-                    Spacer(Modifier.height(14.dp))
+                    SisSeparador()
                     Segmentos("Volumen", listOf("Bajo", "Medio", "Alto"), ajustes.volumen) {
                         onCambiar(ajustes.copy(volumen = it))
                         onProbarVolumen(it) // suena un momento para que escuche qué tan fuerte es
@@ -122,60 +101,42 @@ fun AjustesScreen(
             }
 
             // ---------- Reloj ----------
-            Seccion("Reloj inteligente") {
-                Tarjeta(arriba = 16, abajo = 4) {
+            SisSeccion("Reloj inteligente") {
+                Tarjeta {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(AzulClaro)
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            .heightIn(min = Medida.Fila)
+                            .semantics(mergeDescendants = true) {},
+                        horizontalArrangement = Arrangement.spacedBy(Espacio.M),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(RoundedCornerShape(15.dp))
-                                .background(Blanco),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Iconos.RelojPulsera, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(28.dp))
+                        SisIconoLista(Iconos.RelojPulsera)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(relojNombre, style = Letra.TextoFuerte, color = Tono.Noche)
+                            Text("Reloj inteligente", style = Letra.Etiqueta, color = Tono.Suave)
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(relojNombre, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = TextoAzulOscuro)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(if (relojConectado) AzulBoton else BordeRadio)
-                                )
-                                Text(
-                                    if (relojConectado) "Conectado" else "Sin conexión",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextoAzul
-                                )
-                            }
-                        }
+                        Text(
+                            if (relojConectado) "Conectado" else "Sin conexión",
+                            style = Letra.EtiquetaFuerte,
+                            color = if (relojConectado) Tono.Acento else Tono.Suave
+                        )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    SisSeparador()
                     FilaInterruptor("Avisarme en el reloj", ajustes.avisarEnReloj) { onCambiar(ajustes.copy(avisarEnReloj = it)) }
-                    Divisor()
+                    SisSeparador()
                     FilaInterruptor("Vibrar en el reloj", ajustes.vibrarEnReloj) { onCambiar(ajustes.copy(vibrarEnReloj = it)) }
-                    Divisor()
+                    SisSeparador()
                     FilaInterruptor("Sonar en el reloj", ajustes.sonarEnReloj) { onCambiar(ajustes.copy(sonarEnReloj = it)) }
                 }
             }
 
             // ---------- Pantalla y voz ----------
-            Seccion("Pantalla y voz") {
-                Tarjeta(arriba = 16, abajo = 16) {
+            SisSeccion("Pantalla y voz") {
+                Tarjeta(vertical = Espacio.M, espacio = Espacio.L) {
                     Segmentos("Colores", listOf("Claro", "Oscuro"), if (ajustes.temaOscuro) 1 else 0) {
                         onCambiar(ajustes.copy(temaOscuro = it == 1))
                     }
-                    Spacer(Modifier.height(18.dp))
                     Segmentos("Velocidad de la voz", listOf("Lenta", "Normal"), if (ajustes.vozLenta) 0 else 1) {
                         onCambiar(ajustes.copy(vozLenta = it == 0))
                     }
@@ -184,17 +145,16 @@ fun AjustesScreen(
 
             // ---------- Demostración ----------
             // "Probar recordatorio" le sirve a cualquiera; "Reiniciar" solo en el celular de la feria
-            if (puedeProbar || mostrarDemo) Seccion(if (mostrarDemo) "Para la demostración" else "Probar") {
-                Tarjeta(arriba = 16, abajo = 16) {
-                    if (puedeProbar) BotonContorno("Probar recordatorio en 10 segundos", Iconos.Campana, onProbarRecordatorio)
-                    if (puedeProbar && mostrarDemo) Spacer(Modifier.height(10.dp))
-                    if (mostrarDemo) BotonContorno("Reiniciar demostración", Iconos.Reloj, onReiniciarDemo)
+            if (puedeProbar || mostrarDemo) SisSeccion(if (mostrarDemo) "Para la demostración" else "Probar") {
+                Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                    if (puedeProbar) SisBoton("Probar recordatorio en 10 segundos", onProbarRecordatorio, icono = Iconos.Campana, contorno = true)
+                    if (mostrarDemo) SisBoton("Reiniciar demostración", onReiniciarDemo, icono = Iconos.Reloj, contorno = true)
                 }
             }
 
             // ---------- Más ----------
-            Seccion("Más") {
-                Tarjeta(arriba = 0, abajo = 0) {
+            SisSeccion("Más") {
+                Tarjeta {
                     val opciones = listOf(
                         "Mi perfil" to nombre,
                         "Mi médico" to "",
@@ -205,17 +165,15 @@ fun AjustesScreen(
                         "Acerca de BuenVivir" to ""
                     )
                     opciones.forEachIndexed { i, (texto, valor) ->
-                        if (i > 0) Divisor()
+                        if (i > 0) SisSeparador()
                         FilaOpcion(texto, valor) { onAbrirOpcion(texto) }
                     }
                 }
                 Text(
                     "BuenVivir · versión 1.0",
-                    fontSize = 15.sp,
-                    color = TextoSecundario,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp),
+                    style = Letra.Etiqueta,
+                    color = Tono.Suave,
+                    modifier = Modifier.fillMaxWidth(),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
@@ -227,57 +185,20 @@ fun AjustesScreen(
 
 // ---------- Piezas ----------
 
+/** Caja con borde fino; las filas van separadas por líneas. */
 @Composable
-private fun BotonContorno(texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 54.dp)
-            .clip(RoundedCornerShape(27.dp))
-            .border(2.dp, AzulBoton, RoundedCornerShape(27.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icono, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(texto, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = AzulBoton)
-    }
-}
-
-@Composable
-private fun Seccion(titulo: String, contenido: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            titulo,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextoOscuro,
-            modifier = Modifier.semantics { heading() }
-        )
-        contenido()
-    }
-}
-
-@Composable
-private fun Tarjeta(arriba: Int, abajo: Int, contenido: @Composable ColumnScope.() -> Unit) {
+private fun Tarjeta(
+    vertical: androidx.compose.ui.unit.Dp = Espacio.S,
+    espacio: androidx.compose.ui.unit.Dp = 0.dp,
+    contenido: @Composable ColumnScope.() -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
-            .padding(start = 16.dp, end = 16.dp, top = arriba.dp, bottom = abajo.dp),
+            .border(1.dp, Tono.Borde, RoundedCornerShape(Medida.RadioCaja))
+            .padding(horizontal = Espacio.M, vertical = vertical),
+        verticalArrangement = Arrangement.spacedBy(espacio),
         content = contenido
-    )
-}
-
-@Composable
-private fun Divisor() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .background(LavandaSuave)
     )
 }
 
@@ -291,25 +212,26 @@ private fun FilaInterruptor(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = if (detalle == null) 62.dp else 76.dp)
-            .toggleable(value = activo, role = Role.Switch, onValueChange = onCambio),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .heightIn(min = Medida.Boton)
+            .toggleable(value = activo, role = Role.Switch, onValueChange = onCambio)
+            .padding(vertical = Espacio.S),
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(texto, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TextoNormal)
-            detalle?.let { Text(it, fontSize = 15.sp, color = TextoSecundario) }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(texto, style = Letra.TextoFuerte, color = Tono.Noche)
+            detalle?.let { Text(it, style = Letra.Etiqueta, color = Tono.Suave) }
         }
         Switch(
             checked = activo,
             onCheckedChange = null, // la fila completa es la que se toca
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Blanco,
-                checkedTrackColor = AzulBoton,
-                checkedBorderColor = AzulBoton,
-                uncheckedThumbColor = BordeRadio,
-                uncheckedTrackColor = Blanco,
-                uncheckedBorderColor = BordeRadio
+                checkedThumbColor = Tono.Blanco,
+                checkedTrackColor = Tono.Acento,
+                checkedBorderColor = Tono.Acento,
+                uncheckedThumbColor = Tono.BordeCampo,
+                uncheckedTrackColor = Tono.Blanco,
+                uncheckedBorderColor = Tono.BordeCampo
             )
         )
     }
@@ -320,50 +242,46 @@ private fun FilaOpcion(texto: String, valor: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .clickable(role = Role.Button, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .heightIn(min = Medida.Boton)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = Espacio.S),
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(texto, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TextoNormal, modifier = Modifier.weight(1f))
-        if (valor.isNotEmpty()) {
-            Text(valor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoAzul, maxLines = 1)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(texto, style = Letra.TextoFuerte, color = Tono.Noche)
+            if (valor.isNotEmpty()) Text(valor, style = Letra.Etiqueta, color = Tono.Suave, maxLines = 1)
         }
-        Icon(Iconos.Flecha, contentDescription = null, tint = TextoAzul, modifier = Modifier.size(22.dp))
+        Icon(Iconos.Flecha, contentDescription = null, tint = Tono.Suave, modifier = Modifier.size(20.dp))
     }
 }
 
 /** Botones pegados para escoger una opción (Bajo / Medio / Alto...). */
 @Composable
 private fun Segmentos(titulo: String, opciones: List<String>, elegida: Int, onElegir: (Int) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(titulo, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TextoNormal)
+    Column(modifier = Modifier.padding(vertical = Espacio.S), verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+        Text(titulo, style = Letra.TextoFuerte, color = Tono.Noche)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(LavandaSuave)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Tono.Gris)
                 .padding(4.dp)
                 .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(Espacio.S)
         ) {
             opciones.forEachIndexed { i, opcion ->
                 val activa = i == elegida
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (activa) AzulBoton else Color.Transparent)
+                        .height(Medida.Chip)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (activa) Tono.Noche else Color.Transparent)
                         .selectable(selected = activa, role = Role.RadioButton) { onElegir(i) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        opcion,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (activa) Blanco else TextoChip
-                    )
+                    Text(opcion, style = Letra.EtiquetaFuerte, color = if (activa) Tono.Blanco else Tono.Noche)
                 }
             }
         }

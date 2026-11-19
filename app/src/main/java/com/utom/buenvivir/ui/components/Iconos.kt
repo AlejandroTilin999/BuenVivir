@@ -57,6 +57,15 @@ object Iconos {
     ).apply {
         addPath(pathData = addPathNodes("M8 5v14l11-7z"), fill = SolidColor(Color.Black))
     }.build()
+    // Rellenos: la pestaña activa del menú de abajo
+    val CasaLlena = relleno("M3 11 12 4l9 7v9a1 1 0 0 1 -1 1h-5v-6h-6v6H4a1 1 0 0 1 -1 -1z")
+    val PastillaLlena = relleno(girados = listOf("M7 8h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0 -8z"))
+    val FamiliaLlena = relleno(
+        "M5.5 8a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0",
+        "M14.5 9a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0",
+        "M2.5 20a6.5 6.5 0 0 1 13 0z",
+        "M15.6 20a7.4 7.4 0 0 0 -1.9 -5.1A5 5 0 0 1 21.5 19v1z"
+    )
     val Tache = icono("M6 6l12 12", "M18 6L6 18", grosor = 3f)
     val Lupa = icono("M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0", "M20 20l-4-4", grosor = 2.4f)
     val Persona = icono("M8 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M4 21a8 8 0 0 1 16 0")
@@ -126,3 +135,17 @@ private fun ImageVector.Builder.trazo(d: String, grosor: Float) {
         strokeLineJoin = StrokeJoin.Round
     )
 }
+
+/** Ícono relleno (sin trazo), para la pestaña activa. */
+private fun relleno(vararg formas: String, girados: List<String> = emptyList()): ImageVector =
+    ImageVector.Builder(
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        group(rotate = -45f, pivotX = 12f, pivotY = 12f) {
+            girados.forEach { addPath(pathData = addPathNodes(it), fill = SolidColor(Color.Black)) }
+        }
+        formas.forEach { addPath(pathData = addPathNodes(it), fill = SolidColor(Color.Black)) }
+    }.build()

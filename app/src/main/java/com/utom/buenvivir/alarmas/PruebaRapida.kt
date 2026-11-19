@@ -34,30 +34,17 @@ object PruebaRapida {
 }
 
 /**
- * Recuerda que la alarma de esta pastilla es de prueba, para que la respuesta no se guarde
- * como toma real (ni en el celular, ni en Firebase, ni en lo que ve el médico).
- * Vale por [MINUTOS] minutos y solo para la primera respuesta.
+ * Antes, la alarma de prueba no se guardaba como toma real. Para la demostración se cambió:
+ * la respuesta a "Probar recordatorio" SÍ se guarda (celular, Firebase y lo que ve el médico),
+ * así el motivo le llega al médico y al cuidador igual que en una toma normal.
+ * Se dejan las mismas funciones para no tocar el resto del código.
  */
 object ModoPrueba {
-    private const val MINUTOS = 10
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences("modo_prueba", Context.MODE_PRIVATE)
+    fun marcar(context: Context, horarioId: Long, fecha: LocalDate) { /* ya no marca nada */ }
 
-    private fun clave(horarioId: Long, fecha: LocalDate) = "$horarioId|$fecha"
+    /** Siempre false: la respuesta cuenta como real. */
+    fun activa(context: Context, horarioId: Long, fecha: LocalDate): Boolean = false
 
-    fun marcar(context: Context, horarioId: Long, fecha: LocalDate) {
-        val vence = System.currentTimeMillis() + PruebaRapida.SEGUNDOS * 1_000L + MINUTOS * 60_000L
-        prefs(context).edit().putLong(clave(horarioId, fecha), vence).apply()
-    }
-
-    /** true si la respuesta a esta pastilla es de una prueba (sin borrar la marca). */
-    fun activa(context: Context, horarioId: Long, fecha: LocalDate): Boolean =
-        prefs(context).getLong(clave(horarioId, fecha), 0L) > System.currentTimeMillis()
-
-    /** Igual que [activa], pero borra la marca: la siguiente respuesta ya cuenta como real. */
-    fun consumir(context: Context, horarioId: Long, fecha: LocalDate): Boolean {
-        val era = activa(context, horarioId, fecha)
-        prefs(context).edit().remove(clave(horarioId, fecha)).apply()
-        return era
-    }
+    /** Siempre false: la respuesta cuenta como real. */
+    fun consumir(context: Context, horarioId: Long, fecha: LocalDate): Boolean = false
 }

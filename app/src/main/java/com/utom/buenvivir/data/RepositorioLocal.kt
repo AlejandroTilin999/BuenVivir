@@ -9,8 +9,10 @@ import com.utom.buenvivir.data.db.TomaEntity
 import com.utom.buenvivir.alarmas.ModoPrueba
 import com.utom.buenvivir.reloj.Reloj
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.ZoneId
 
 /**
@@ -141,6 +143,58 @@ class RepositorioLocal private constructor(private val dao: BuenVivirDao, privat
     suspend fun horario(id: Long) = dao.horario(id)
     suspend fun medicina(id: Long) = dao.medicina(id)
     suspend fun toma(horarioId: Long, fecha: LocalDate) = dao.toma(horarioId, fecha.toString())
+
+    /**
+     * Botón "Probar" de la feria: si el celular no tiene medicinas, carga la Metformina de Doña María
+     * (8:00 a. m. y 8:00 p. m.) y la sube a Firebase para que la vea su médico.
+     * Regresa el horario que se va a probar: la siguiente toma de hoy, o la última si ya pasaron todas.
+     */
+    suspend fun horarioDemo(): HorarioEntity? {
+        if (dao.contarMedicinas() == 0) {
+            val medicinaId = dao.insertarMedicina(
+                MedicinaEntity(
+                    nombre = "Metformina",
+                    para = "Para controlar el azúcar",
+                    cantidad = "1 pastilla blanca",
+                    indicacion = "después del desayuno y después de la cena",
+                    video = "¿Para qué sirve la metformina?"
+                )
+            )
+            dao.insertarHorarios(
+                listOf(
+                    HorarioEntity(medicinaId = medicinaId, minutos = 8 * 60, indicacion = "después del desayuno"),
+                    HorarioEntity(medicinaId = medicinaId, minutos = 20 * 60, indicacion = "después de cenar")
+                )
+            )
+            runCatching { subirSinNube() }
+        }
+        val hs = horarios().sortedBy { it.minutos }
+        val ahora = LocalTime.now().let { it.hour * 60 + it.minute }
+        return hs.firstOrNull { it.minutos >= ahora } ?: hs.lastOrNull()
+    }
+
+    /**
+     * Quita la Metformina de ejemplo que carga el botón "Probar" (del celular y, si se subió, de Firebase).
+     * Regresa cuántas quitó.
+     */
+    suspend fun quitarDemo(): Int {
+        val demo = dao.todasMedicinas().filter {
+            it.nombre == "Metformina" && it.cantidad == "1 pastilla blanca" &&
+                it.indicacion == "después del desayuno y después de la cena"
+        }
+        val uid = Nube.miId()
+        demo.forEach { m ->
+            if (uid != null && m.nubeId.isNotEmpty()) runCatching { withTimeoutOrNull(6_000) { Recetas.quitar(uid, m.nubeId) } }
+            quitarMedicina(m.id)
+        }
+        return demo.size
+    }
+
+    /** Quita una medicina del celular con sus horarios (sus alarmas ya no suenan). */
+    suspend fun quitarMedicina(medicinaId: Long) {
+        dao.horariosDe(medicinaId).forEach { dao.borrarHorario(it.id) }
+        dao.borrarMedicina(medicinaId)
+    }
 
     /** Borra todas las tomas y vuelve a cargar la semana de demostración (para la feria). */
     suspend fun reiniciarDemo() {

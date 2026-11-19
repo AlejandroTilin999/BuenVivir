@@ -98,6 +98,17 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) pedirPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
 
+        // Android 14+: permiso para abrir la app a pantalla completa cuando toca la pastilla
+        if (Build.VERSION.SDK_INT >= 34) {
+            val nm = getSystemService(android.app.NotificationManager::class.java)
+            if (!nm.canUseFullScreenIntent()) runCatching {
+                startActivity(
+                    Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                        .setData(android.net.Uri.parse("package:$packageName"))
+                )
+            }
+        }
+
         setContent {
             PantallaReloj(
                 toma = toma,

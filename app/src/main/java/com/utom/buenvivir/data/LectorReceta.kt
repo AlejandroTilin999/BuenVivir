@@ -8,6 +8,7 @@ import android.util.Log
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.RequestOptions
 import com.google.firebase.ai.type.content
 import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.Dispatchers
@@ -38,10 +39,16 @@ sealed interface Lectura {
 object LectorReceta {
     private const val TAG = "LectorReceta"
 
-    /** Si Google cambia o retira el modelo, solo se cambia este nombre. */
-    private const val MODELO = "gemini-3.8-flash"
+    /**
+     * Modelos que se prueban en orden. Primero el ligero (responde más rápido);
+     * si falla, se intenta con el siguiente. Si Google retira uno, solo se cambia aquí.
+     */
+    private val MODELOS = listOf("gemini-3.5-flash-lite", "gemini-3.8-flash")
 
-    private const val LADO_MAXIMO = 1600   // px: suficiente para leer letra impresa, sin mandar fotos pesadas
+    /** Máximo de espera por intento, para que la app no se quede minutos cargando. */
+    private const val ESPERA_MS = 25_000L
+
+    private const val LADO_MAXIMO = 1024   // px: suficiente para leer letra impresa y la petición pesa menos
 
     private val INSTRUCCION = """
         Eres un asistente que lee recetas médicas mexicanas para una app de recordatorios de medicamentos.
@@ -50,7 +57,7 @@ object LectorReceta {
 
         Reglas:
         - "nombre": solo el nombre genérico con mayúscula inicial, sin dosis (ejemplo: "Metformina").
-        - "para": para qué sirve en palabras sencillas solo si la receta lo dice o el diagnóstico lo deja claro (ejemplo: "Para controlar el azúcar"); si no, "".
+        - "para": para qué sirve, en palabras sencillas que entienda un adulto mayor. Si la receta lo dice, úsalo; si no, escribe el uso más común de ese medicamento (ejemplo: Metformina = "Para controlar el azúcar"). Si no lo sabes con seguridad, "".
         - "presentacion": la concentración (ejemplo: "850 mg"); si no viene, "".
         - "cantidad": cuánto toma cada vez, en este formato: "½ tableta", "1 tableta", "2 tabletas", "1 cápsula" o "10 unidades" para insulina.
         - "momento": exactamente uno de "antes de comer", "con la comida", "después de comer". Desayuno, comida y cena cuentan como comer. Si no lo dice, "".
@@ -61,26 +68,36 @@ object LectorReceta {
         - Si la imagen no es una receta médica, responde {"esReceta": false, "medicinas": []}.
     """.trimIndent()
 
-    private val modelo by lazy {
+    private fun modelo(nombre: String) =
         Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
-            modelName = MODELO,
-            generationConfig = generationConfig { responseMimeType = "application/json" }
+            modelName = nombre,
+            generationConfig = generationConfig { responseMimeType = "application/json" },
+            requestOptions = RequestOptions(timeoutInMillis = ESPERA_MS)
         )
-    }
 
     suspend fun leer(context: Context, foto: Uri): Lectura {
         val imagen = withContext(Dispatchers.IO) { cargar(context, foto) }
             ?: return Lectura.Mal("No se pudo abrir la foto. Intenta tomarla otra vez.")
-        return try {
-            val respuesta = modelo.generateContent(content {
-                image(imagen)
-                text(INSTRUCCION)
-            })
-            val texto = respuesta.text ?: return Lectura.Mal("No se pudo leer la receta. Intenta con otra foto.")
-            interpretar(texto)
-        } catch (e: Exception) {
-            Log.w(TAG, "Gemini no pudo leer la receta", e)
-            Lectura.Mal("No se pudo leer la receta. Revisa tu conexión a internet e inténtalo otra vez.")
+        var ultimoError: Exception? = null
+        for (nombre in MODELOS) {
+            try {
+                val respuesta = modelo(nombre).generateContent(content {
+                    image(imagen)
+                    text(INSTRUCCION)
+                })
+                val texto = respuesta.text ?: continue
+                Log.i(TAG, "Receta leída con $nombre")
+                return interpretar(texto)
+            } catch (e: Exception) {
+                Log.w(TAG, "Gemini ($nombre) no pudo leer la receta", e)
+                ultimoError = e
+            }
+        }
+        val mensaje = ultimoError?.message.orEmpty()
+        return if (mensaje.contains("Deadline", ignoreCase = true) || mensaje.contains("timeout", ignoreCase = true)) {
+            Lectura.Mal("El servicio para leer recetas está tardando. Inténtalo otra vez o registra la medicina a mano.")
+        } else {
+            Lectura.Mal("No se pudo leer la receta. Inténtalo otra vez o registra la medicina a mano.")
         }
     }
 

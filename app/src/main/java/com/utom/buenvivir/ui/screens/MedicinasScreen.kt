@@ -28,10 +28,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.DiaSemana
+import com.utom.buenvivir.ui.components.GraficaMotivos
 import com.utom.buenvivir.data.EstadoDia
 import com.utom.buenvivir.data.Medicina
 import com.utom.buenvivir.data.Repositorio
-import com.utom.buenvivir.ui.components.BotonEscuchar
+import com.utom.buenvivir.ui.components.*
 import com.utom.buenvivir.ui.components.Iconos
 import com.utom.buenvivir.ui.components.MenuInferior
 import com.utom.buenvivir.ui.theme.*
@@ -51,6 +52,7 @@ fun MedicinasScreen(
     totalSemana: Int,
     tomasHoy: List<TomaDelDia>,
     medicinas: List<Medicina>,
+    motivos: List<Pair<String, Int>> = emptyList(),   // por qué no se la tomó, últimos 30 días
     onEscuchar: () -> Unit = {},
     onAbrirMedicina: (Medicina) -> Unit = {},
     onAgregar: () -> Unit = {},
@@ -60,24 +62,32 @@ fun MedicinasScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Blanco)
+            .background(Tono.Blanco)
     ) {
-        Encabezado(semana, tomadasSemana, totalSemana, onEscuchar)
+        SisEncabezado("Mis medicinas", onEscuchar = onEscuchar) {
+            Semana(semana, tomadasSemana, totalSemana)
+        }
 
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .padding(horizontal = Espacio.M, vertical = Espacio.L),
+            verticalArrangement = Arrangement.spacedBy(Espacio.XL)
         ) {
-            if (tomasHoy.isNotEmpty()) Seccion("Hoy") { TarjetaHoy(tomasHoy) }
-            Seccion("Tus medicinas") {
-                if (medicinas.isEmpty()) {
-                    Text("Todavía no tienes medicinas.", fontSize = 19.sp, color = TextoSecundario)
+            if (tomasHoy.isNotEmpty()) SisSeccion("Hoy") { TarjetaHoy(tomasHoy) }
+            SisSeccion("Tus medicinas") {
+                Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
+                    if (medicinas.isEmpty()) {
+                        Text("Todavía no tienes medicinas.", style = Letra.Texto, color = Tono.Suave)
+                    }
+                    medicinas.forEach { TarjetaMedicina(it) { onAbrirMedicina(it) } }
+                    SisBoton("Agregar una medicina", onAgregar, icono = Iconos.Mas, contorno = true)
                 }
-                medicinas.forEach { TarjetaMedicina(it) { onAbrirMedicina(it) } }
-                BotonAgregar(onAgregar)
+            }
+            // Solo si ha faltado alguna: así ve qué le está costando más trabajo
+            if (motivos.isNotEmpty()) {
+                GraficaMotivos(motivos, "¿Por qué no me la tomé?", "Últimos 30 días")
             }
         }
 
@@ -85,60 +95,29 @@ fun MedicinasScreen(
     }
 }
 
-// ---------- Encabezado con la semana ----------
-// Mide lo mismo que el de Inicio: arriba 16, título + línea de 19 sp, espacio 18,
-// tarjeta de 80 y abajo 24. Así no "brinca" al cambiar de pestaña.
+// ---------- La semana (dentro del encabezado) ----------
 
 @Composable
-private fun Encabezado(semana: List<DiaSemana>, tomadas: Int, total: Int, onEscuchar: () -> Unit) {
+private fun Semana(semana: List<DiaSemana>, tomadas: Int, total: Int) {
     Column(
         modifier = Modifier
+            .padding(top = Espacio.S)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-            .background(Lavanda)
-            .statusBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+            .clip(RoundedCornerShape(Medida.RadioCaja))
+            .background(Tono.Blanco)
+            .padding(Espacio.M),
+        verticalArrangement = Arrangement.spacedBy(Espacio.M)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f, fill = false),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    "Mis medicinas",
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = TextoOscuro,
-                    letterSpacing = (-0.5).sp,
-                    modifier = Modifier.semantics { heading() }
-                )
-                Text(
-                    buildAnnotatedString {
-                        append("Esta semana: ")
-                        withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) { append("$tomadas de $total") }
-                        append(" tomadas")
-                    },
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextoLavanda
-                )
-            }
-            BotonEscuchar("Escuchar esta pantalla", Blanco, onEscuchar)
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(22.dp))
-                .background(Blanco)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        Text(
+            buildAnnotatedString {
+                append("Esta semana: ")
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("$tomadas de $total") }
+                append(" tomadas")
+            },
+            style = Letra.TextoFuerte,
+            color = Tono.Noche
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
             semana.forEach { DiaCalendario(it, Modifier.weight(1f)) }
         }
     }
@@ -156,152 +135,80 @@ private fun DiaCalendario(dia: DiaSemana, modifier: Modifier) {
     Column(
         modifier = modifier.semantics(mergeDescendants = true) { contentDescription = descripcion },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(Espacio.S)
     ) {
-        Text(
-            dia.letra,
-            fontSize = 15.sp,
-            lineHeight = 18.sp,
-            fontWeight = if (esHoy) FontWeight.ExtraBold else FontWeight.SemiBold,
-            color = if (esHoy) AzulBoton else TextoSecundario
-        )
+        Text(dia.letra, style = Letra.EtiquetaFuerte, color = if (esHoy) Tono.Acento else Tono.Noche)
         val circulo = Modifier
-            .size(34.dp)
+            .size(32.dp)
             .clip(CircleShape)
         when (dia.estado) {
-            EstadoDia.Completo -> Box(circulo.background(AzulBoton), contentAlignment = Alignment.Center) {
-                Icon(Iconos.Palomita, contentDescription = null, tint = Blanco, modifier = Modifier.size(18.dp))
+            EstadoDia.Completo -> Box(circulo.background(Tono.Acento), contentAlignment = Alignment.Center) {
+                Icon(Iconos.Palomita, contentDescription = null, tint = Tono.Blanco, modifier = Modifier.size(16.dp))
             }
-            EstadoDia.Falto -> Box(circulo.background(Lavanda), contentAlignment = Alignment.Center) {
-                Icon(Iconos.Menos, contentDescription = null, tint = TextoChip, modifier = Modifier.size(18.dp))
+            EstadoDia.Falto -> Box(circulo.background(Tono.Suave), contentAlignment = Alignment.Center) {
+                Icon(Iconos.Menos, contentDescription = null, tint = Tono.Blanco, modifier = Modifier.size(16.dp))
             }
-            EstadoDia.Hoy -> Box(circulo.background(Blanco).border(3.dp, AzulBoton, CircleShape))
-            EstadoDia.Futuro -> Box(circulo.background(Blanco).border(2.dp, BordeTarjeta, CircleShape))
+            EstadoDia.Hoy -> Box(circulo.background(Tono.Blanco).border(2.dp, Tono.Acento, CircleShape))
+            EstadoDia.Futuro -> Box(circulo.background(Tono.Blanco).border(1.dp, Tono.Borde, CircleShape))
         }
     }
 }
 
-// ---------- Secciones ----------
-
-@Composable
-private fun Seccion(titulo: String, contenido: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            titulo,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextoOscuro,
-            modifier = Modifier.semantics { heading() }
-        )
-        contenido()
-    }
-}
+// ---------- Hoy ----------
 
 @Composable
 private fun TarjetaHoy(tomas: List<TomaDelDia>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(2.dp, BordeTarjeta, RoundedCornerShape(22.dp))
-    ) {
+    SisCaja(espacio = Espacio.S) {
         tomas.forEachIndexed { i, toma ->
-            if (i > 0) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 14.dp)
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(LavandaSuave)
-                )
-            }
+            if (i > 0) SisSeparador()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics(mergeDescendants = true) {}
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .heightIn(min = Medida.Tactil)
+                    .semantics(mergeDescendants = true) {},
+                horizontalArrangement = Arrangement.spacedBy(Espacio.M),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(toma.hora, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextoNormal)
-                    Text(toma.medicina, fontSize = 16.sp, color = TextoSecundario)
-                    toma.horaReal?.let {
-                        Text("Tomada a las $it", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextoMoradoMedio)
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(toma.medicina, style = Letra.TextoFuerte, color = Tono.Noche)
+                    Text(
+                        toma.horaReal?.let { "${toma.hora} · tomada a las $it" } ?: toma.hora,
+                        style = Letra.Etiqueta,
+                        color = Tono.Suave
+                    )
                 }
-                ChipEstado(toma.estado)
+                when (toma.estado) {
+                    EstadoToma.Tomada -> SisEstado("Tomada", true)
+                    EstadoToma.Pendiente -> SisEstado("Pendiente", null)
+                    is EstadoToma.Omitida -> SisEstado("No la tomó", false)
+                }
             }
         }
     }
 }
 
-@Composable
-private fun ChipEstado(estado: EstadoToma) {
-    val forma = RoundedCornerShape(12.dp)
-    val (texto, icono, fondo, color) = when (estado) {
-        EstadoToma.Tomada -> Estilo("Tomada", Iconos.Palomita, Violeta, Blanco)
-        EstadoToma.Pendiente -> Estilo("Pendiente", Iconos.Reloj, LavandaChip, TextoChip)
-        is EstadoToma.Omitida -> Estilo("No la tomó", Iconos.Menos, GrisAviso, Blanco)
-    }
-    Row(
-        modifier = Modifier
-            .clip(forma)
-            .background(fondo)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icono, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
-        Text(texto, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = color)
-    }
-}
-
-private data class Estilo(val texto: String, val icono: ImageVector, val fondo: Color, val color: Color)
-
-@Composable
-private fun BotonAgregar(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp)
-            .clip(RoundedCornerShape(30.dp))
-            .border(2.dp, AzulBoton, RoundedCornerShape(30.dp))
-            .clickable(role = Role.Button, onClick = onClick),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Iconos.Mas, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Agregar una medicina", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = AzulBoton)
-    }
-}
+// ---------- Tus medicinas ----------
 
 @Composable
 private fun TarjetaMedicina(medicina: Medicina, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(Medida.RadioCaja)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(AzulClaro)
+            .heightIn(min = Medida.Fila)
+            .clip(forma)
+            .border(1.dp, Tono.Borde, forma)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(Espacio.M),
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(54.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Blanco),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Iconos.Pastilla, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(30.dp))
+        SisIconoLista(Iconos.Pastilla)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(medicina.nombre, style = Letra.TextoFuerte, color = Tono.Noche)
+            Text(medicina.frecuencia, style = Letra.Etiqueta, color = Tono.Suave)
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(medicina.nombre, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = TextoAzulOscuro)
-            Text(medicina.frecuencia, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextoAzul)
-        }
-        Icon(Iconos.Flecha, contentDescription = null, tint = AzulBoton, modifier = Modifier.size(26.dp))
+        Icon(Iconos.Flecha, contentDescription = null, tint = Tono.Suave, modifier = Modifier.size(20.dp))
     }
 }
 

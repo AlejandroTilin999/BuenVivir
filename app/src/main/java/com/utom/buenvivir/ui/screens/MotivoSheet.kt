@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -33,12 +32,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.utom.buenvivir.data.Repositorio
-import com.utom.buenvivir.ui.components.BotonEscuchar
-import com.utom.buenvivir.ui.components.EnlaceSecundario
+import com.utom.buenvivir.ui.components.Espacio
 import com.utom.buenvivir.ui.components.Iconos
+import com.utom.buenvivir.ui.components.Letra
+import com.utom.buenvivir.ui.components.Medida
+import com.utom.buenvivir.ui.components.Tono
 import com.utom.buenvivir.ui.theme.*
 
-/** Hoja flotante para elegir por qué no se tomó la pastilla. */
+/**
+ * Hoja que sube desde abajo para elegir por qué no se tomó la pastilla.
+ * Primero elige un motivo y luego toca Guardar (así un toque por error no guarda nada).
+ */
 @Composable
 fun MotivoSheet(
     motivos: List<String>,
@@ -47,122 +51,128 @@ fun MotivoSheet(
     onCancelar: () -> Unit
 ) {
     var elegido by rememberSaveable { mutableStateOf<Int?>(null) }
-    val forma = RoundedCornerShape(28.dp)
+    val forma = RoundedCornerShape(topStart = Espacio.XL, topEnd = Espacio.XL)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(10.dp)
-            .shadow(24.dp, forma)
             .clip(forma)
-            .background(Blanco)
+            .background(Tono.Blanco)
             // Evita que un toque dentro de la hoja la cierre
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(start = Espacio.M, end = Espacio.M, top = Espacio.S, bottom = Espacio.L),
+        verticalArrangement = Arrangement.spacedBy(Espacio.M)
     ) {
+        // Asa
         Box(
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
-                .width(48.dp)
-                .height(5.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(AsaHoja)
+                .width(Espacio.XL)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Tono.BordeCampo)
         )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top
+            horizontalArrangement = Arrangement.spacedBy(Espacio.M),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "¿Por qué no te la tomaste?",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    lineHeight = 29.sp,
-                    color = TextoOscuro,
+                    style = Letra.Subtitulo,
+                    color = Tono.Noche,
                     modifier = Modifier.semantics { heading() }
                 )
-                Text("Tu familia y tu médico lo verán.", fontSize = 16.sp, color = TextoSecundario)
+                Text("Así tu médico sabe cómo ayudarte.", style = Letra.Texto, color = Tono.Suave)
             }
-            BotonEscuchar("Escuchar las opciones", LavandaChip, onEscuchar)
+            Box(
+                modifier = Modifier
+                    .size(Medida.Tactil)
+                    .clip(CircleShape)
+                    .background(Tono.Chip)
+                    .clickable(role = Role.Button, onClick = onEscuchar),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Iconos.Bocina, contentDescription = "Escuchar las opciones", tint = Tono.Acento, modifier = Modifier.size(24.dp))
+            }
         }
 
         Column(
             modifier = Modifier.selectableGroup(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(Espacio.S)
         ) {
             motivos.forEachIndexed { i, motivo ->
                 OpcionMotivo(texto = motivo, seleccionada = elegido == i) { elegido = i }
             }
         }
 
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(Espacio.S)) {
             Button(
                 onClick = { elegido?.let { onGuardar(motivos[it]) } },
                 enabled = elegido != null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp),
-                shape = RoundedCornerShape(30.dp),
+                    .height(Medida.Boton),
+                shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AzulBoton,
-                    contentColor = Blanco,
-                    disabledContainerColor = AzulBoton.copy(alpha = 0.35f),
-                    disabledContentColor = Blanco
+                    containerColor = Tono.Noche,
+                    contentColor = Tono.Blanco,
+                    disabledContainerColor = Tono.Gris,
+                    disabledContentColor = Tono.Suave
                 ),
                 elevation = null
             ) {
-                Text("Guardar motivo", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                Text("Guardar motivo", style = Letra.Boton)
             }
-            EnlaceSecundario("Cancelar", onCancelar)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(Medida.Tactil)
+                    .clip(RoundedCornerShape(24.dp))
+                    .clickable(role = Role.Button, onClick = onCancelar),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Cancelar", style = Letra.Texto.copy(fontWeight = FontWeight.SemiBold), color = Tono.Acento)
+            }
         }
     }
 }
 
+/** Una opción de motivo: 56 de alto, con círculo que se marca al elegirla. */
 @Composable
 private fun OpcionMotivo(texto: String, seleccionada: Boolean, onClick: () -> Unit) {
-    val forma = RoundedCornerShape(16.dp)
+    val forma = RoundedCornerShape(Medida.RadioCaja)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 50.dp)
+            .heightIn(min = Medida.Boton)
             .clip(forma)
-            .border(
-                width = if (seleccionada) 2.5.dp else 2.dp,
-                color = if (seleccionada) TextoChip else Lavanda,
-                shape = forma
-            )
-            .background(if (seleccionada) FondoSeleccion else Blanco)
+            .border(if (seleccionada) 2.dp else 1.dp, if (seleccionada) Tono.Acento else Tono.BordeCampo, forma)
+            .background(if (seleccionada) Tono.Chip else Tono.Blanco)
             .selectable(selected = seleccionada, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = Espacio.M, vertical = Espacio.S),
+        horizontalArrangement = Arrangement.spacedBy(Espacio.M),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(26.dp)
+                .size(24.dp)
                 .clip(CircleShape)
                 .then(
-                    if (seleccionada) Modifier.background(TextoChip)
-                    else Modifier.border(2.5.dp, BordeRadio, CircleShape).background(Blanco)
+                    if (seleccionada) Modifier.background(Tono.Acento)
+                    else Modifier.border(2.dp, Tono.BordeCampo, CircleShape).background(Tono.Blanco)
                 ),
             contentAlignment = Alignment.Center
         ) {
             if (seleccionada) {
-                Icon(Iconos.Palomita, contentDescription = null, tint = Blanco, modifier = Modifier.size(14.dp))
+                Icon(Iconos.Palomita, contentDescription = null, tint = Tono.Blanco, modifier = Modifier.size(16.dp))
             }
         }
-        Text(
-            texto,
-            fontSize = 18.sp,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (seleccionada) TextoOscuro else TextoNormal
-        )
+        Text(texto, style = Letra.Texto.copy(fontWeight = FontWeight.SemiBold), color = Tono.Noche)
     }
 }
 
